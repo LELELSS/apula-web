@@ -10,6 +10,7 @@
 :root {
   --app-bg: #f4f6f9;
   --app-text: #111111;
+  --card-radius: 14px;
   --panel-bg: #ffffff;
   --panel-text: #111111;
   --panel-border: #d6d6d6;

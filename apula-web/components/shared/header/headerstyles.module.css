@@ -1,8 +1,3 @@
-:global(:root) {
-  --color-red: #A30000; 
-  font-family: var(--font-poppins), sans-serif;
-}
-
 .header {
   position: fixed;
   top: 0;

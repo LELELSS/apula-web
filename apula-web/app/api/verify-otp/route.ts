@@ -1,6 +1,6 @@
 // /app/api/verify-otp/route.ts
 import { NextResponse } from "next/server";
-import { verifyOtp } from "../send-otp/route";
+import { verifyOtp } from "../otp-store";
 
 export async function POST(req: Request) {
   try {

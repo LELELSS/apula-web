@@ -30,16 +30,18 @@
 .searchWrapper {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: min(100%, 700px);
+  justify-content: flex-start;
+  width: 100%;
   gap: 16px;
+  flex-wrap: wrap;
   margin-bottom: 16px;
 }
 
 /* SEARCH BOX */
 .searchBox {
   position: relative;
-  flex: 1 1 auto;
+  flex: 1 1 320px;
+  max-width: 700px;
   min-width: 0;
 }
 
@@ -147,6 +149,7 @@
   position: relative;
   overflow: hidden;
   transition: color 0.3s ease;
+  margin-left: auto;
 }
 
 .dispatchBtn {
@@ -469,6 +472,11 @@
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
+  }
+
+  .searchBox {
+    max-width: 100%;
+    flex-basis: auto;
   }
 
   .modalOverlay {

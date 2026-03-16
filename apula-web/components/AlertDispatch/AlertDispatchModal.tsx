@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styles from "@/app/dashboard/dispatch/dispatch.module.css";
 
 import {
@@ -35,6 +35,7 @@ const AlertDispatchModal = () => {
   const [teamDistancesKm, setTeamDistancesKm] = useState<Record<string, number | null>>({});
   const [recommendedTeamName, setRecommendedTeamName] = useState<string | null>(null);
   const [isCalculatingDistances, setIsCalculatingDistances] = useState(false);
+  const stationCoordCacheRef = useRef<Record<string, { lat: number; lng: number } | null>>({});
 
   const [selectedDispatch, setSelectedDispatch] = useState<any>(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -247,6 +248,7 @@ const AlertDispatchModal = () => {
 
     const fallbackAddress =
       (alert?.userAddress as string | undefined) ||
+      (alert?.alertLocation as string | undefined) ||
       (alert?.location as string | undefined) ||
       "";
 
@@ -273,6 +275,62 @@ const AlertDispatchModal = () => {
     }
   };
 
+  const geocodeAddress = async (address: string) => {
+    const trimmed = address.trim();
+    if (!trimmed) return null;
+
+    try {
+      const response = await fetch(`/api/geocode?q=${encodeURIComponent(trimmed)}`);
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !Array.isArray(result) || result.length === 0) {
+        return null;
+      }
+
+      const first = result[0];
+      const lat = toNumberIfFinite(first?.lat);
+      const lng = toNumberIfFinite(first?.lon);
+
+      if (lat === null || lng === null) return null;
+      return { lat, lng };
+    } catch {
+      return null;
+    }
+  };
+
+  const getStationCoordinates = async (station: any) => {
+    if (!station) return null;
+
+    const directLat =
+      toNumberIfFinite(station?.latitude) ??
+      toNumberIfFinite(station?.lat) ??
+      toNumberIfFinite(station?.locationLat);
+
+    const directLng =
+      toNumberIfFinite(station?.longitude) ??
+      toNumberIfFinite(station?.lng) ??
+      toNumberIfFinite(station?.locationLng);
+
+    if (directLat !== null && directLng !== null) {
+      return { lat: directLat, lng: directLng };
+    }
+
+    const cacheKey =
+      String(station?.id || station?.name || station?.address || "").trim() ||
+      "unknown-station";
+
+    if (cacheKey in stationCoordCacheRef.current) {
+      return stationCoordCacheRef.current[cacheKey];
+    }
+
+    const fallbackAddress =
+      String(station?.address || station?.addressNormalized || station?.name || "").trim();
+
+    const geocoded = await geocodeAddress(fallbackAddress);
+    stationCoordCacheRef.current[cacheKey] = geocoded;
+    return geocoded;
+  };
+
   useEffect(() => {
     const computeDistances = async () => {
       if (dispatchStep !== 2 || !selectedAlert || groupedList.length === 0) {
@@ -293,7 +351,7 @@ const AlertDispatchModal = () => {
 
       const distanceMap: Record<string, number | null> = {};
 
-      groupedList.forEach((group: any) => {
+      for (const group of groupedList as any[]) {
         const team = teams.find((t) => t.teamName === group.team);
         const station = stations.find(
           (s) =>
@@ -301,21 +359,19 @@ const AlertDispatchModal = () => {
             (team?.stationName && s.name === team.stationName)
         );
 
-        const stationLat = toNumberIfFinite(station?.latitude);
-        const stationLng = toNumberIfFinite(station?.longitude);
-
-        if (stationLat === null || stationLng === null) {
+        const stationCoords = await getStationCoordinates(station);
+        if (!stationCoords) {
           distanceMap[group.team] = null;
-          return;
+          continue;
         }
 
         distanceMap[group.team] = haversineDistanceKm(
-          stationLat,
-          stationLng,
+          stationCoords.lat,
+          stationCoords.lng,
           alertCoords.lat,
           alertCoords.lng
         );
-      });
+      }
 
       const nearest = Object.entries(distanceMap)
         .filter(([, km]) => km !== null)

@@ -26,24 +26,6 @@
   --bell-text: #ffffff;
 }
 
-html[data-theme="dark"] {
-  --app-bg: #0f172a;
-  --app-text: #f5f5f5;
-  --panel-bg: #141414;
-  --panel-text: #f5f5f5;
-  --panel-border: #2b2b2b;
-  --muted-text: #cbd5e1;
-  --input-bg: #1c1c1c;
-  --input-border: #3a3a3a;
-  --header-bg: #5e0305;
-  --header-text: #ffffff;
-  --card-bg: #141414;
-  --card-text: #f5f5f5;
-  --card-border: #2b2b2b;
-  --bell-bg: #cc0000;
-  --bell-text: #ffffff;
-}
-
 body {
   margin: 0;
   background-color: var(--app-bg);

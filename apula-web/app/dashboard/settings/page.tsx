@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import AdminHeader from "@/components/shared/adminHeader";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
@@ -8,24 +8,13 @@ import styles from "./settingsStyles.module.css";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { auth, db } from "@/lib/firebase";
-import {
-  updatePassword,
-  updateProfile,
-  onAuthStateChanged,
-} from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { useRouter } from "next/navigation";
+import { updatePassword, updateProfile } from "firebase/auth";
+import { doc, updateDoc } from "firebase/firestore";
 
 const SettingsPage = () => {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false); // set to false since loading is disabled
-
-  // ❌ THEME STATE (COMMENTED OUT USAGE BELOW)
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
-
-  const router = useRouter();
 
   // ❌ AUTH PROTECTION + USER DATA LOADING (COMMENTED OUT)
   /*
@@ -54,26 +43,6 @@ const SettingsPage = () => {
 
     return () => unsubscribe();
   }, [router]);
-  */
-
-  // ❌ THEME LOADING FROM LOCAL STORAGE (COMMENTED OUT)
-  /*
-  useEffect(() => {
-    const stored = localStorage.getItem("theme");
-    const nextTheme =
-      stored === "light" || stored === "dark" ? stored : "dark";
-    setTheme(nextTheme);
-    document.documentElement.dataset.theme = nextTheme;
-  }, []);
-  */
-
-  // ❌ APPLY THEME FUNCTION (COMMENTED OUT)
-  /*
-  const applyTheme = (next: "light" | "dark") => {
-    setTheme(next);
-    localStorage.setItem("theme", next);
-    document.documentElement.dataset.theme = next;
-  };
   */
 
   // ✅ Save changes handler
@@ -113,17 +82,6 @@ const SettingsPage = () => {
     }
   };
 
-  // ❌ LOADING SCREEN (COMMENTED OUT)
-  /*
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen text-lg">
-        Loading user data...
-      </div>
-    );
-  }
-  */
-
   return (
     <div>
       <AdminHeader />
@@ -145,32 +103,6 @@ const SettingsPage = () => {
           <hr className={styles.separator} />
 
           <form onSubmit={handleSave} className={styles.form}>
-
-            {/* ❌ THEME TOGGLE (COMMENTED OUT)
-            <div className={styles.themeRow}>
-              <label className={styles.label}>Theme</label>
-              <div className={styles.themeToggle}>
-                <button
-                  type="button"
-                  className={`${styles.themeBtn} ${
-                    theme === "light" ? styles.themeBtnActive : ""
-                  }`}
-                  onClick={() => applyTheme("light")}
-                >
-                  Light
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.themeBtn} ${
-                    theme === "dark" ? styles.themeBtnActive : ""
-                  }`}
-                  onClick={() => applyTheme("dark")}
-                >
-                  Dark
-                </button>
-              </div>
-            </div>
-            */}
 
             <label className={styles.label}>Full Name</label>
             <input

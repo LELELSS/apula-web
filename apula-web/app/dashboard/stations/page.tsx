@@ -52,6 +52,10 @@ export default function StationsPage() {
   const [stationCoordinates, setStationCoordinates] = useState<LatLngValue | null>(null);
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
 
+  const [editingStation, setEditingStation] = useState<StationRecord | null>(null);
+  const [editStationName, setEditStationName] = useState("");
+  const [editStationAddress, setEditStationAddress] = useState("");
+
   const [selectedStationId, setSelectedStationId] = useState("");
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
 
@@ -85,6 +89,29 @@ export default function StationsPage() {
     [stations]
   );
 
+  const availableVehicles = useMemo(
+    () => vehicles.filter((vehicle) => !String(vehicle.stationId || "").trim()),
+    [vehicles]
+  );
+
+  const editingStationVehicleIds = useMemo(() => {
+    if (!editingStation) {
+      return [] as string[];
+    }
+    return editingStation.vehicleIds || [];
+  }, [editingStation]);
+
+  useEffect(() => {
+    if (!selectedVehicleId) {
+      return;
+    }
+
+    const stillAvailable = availableVehicles.some((vehicle) => vehicle.id === selectedVehicleId);
+    if (!stillAvailable) {
+      setSelectedVehicleId("");
+    }
+  }, [availableVehicles, selectedVehicleId]);
+
   const reverseGeocode = async (coords: LatLngValue) => {
     try {
       const response = await fetch(
@@ -94,7 +121,7 @@ export default function StationsPage() {
       const result = await response.json().catch(() => null);
 
       if (!response.ok) {
-        setSuccessMessage(
+        setErrorMessage(
           result?.error || "Map pin saved. Please enter or confirm the address manually."
         );
         return;
@@ -235,6 +262,180 @@ export default function StationsPage() {
     } catch (err) {
       console.error(err);
       setErrorMessage("Failed to create station.");
+    }
+  };
+
+  const openEditStation = (station: StationRecord) => {
+    setEditingStation(station);
+    setEditStationName(station.name || "");
+    setEditStationAddress(station.address || "");
+  };
+
+  const closeEditStation = () => {
+    setEditingStation(null);
+    setEditStationName("");
+    setEditStationAddress("");
+  };
+
+  const saveEditedStation = async () => {
+    if (!editingStation) {
+      return;
+    }
+
+    if (!editStationName.trim()) {
+      setErrorMessage("Please enter station name.");
+      return;
+    }
+
+    if (!editStationAddress.trim()) {
+      setErrorMessage("Please enter station address.");
+      return;
+    }
+
+    try {
+      const batch = writeBatch(db);
+      const nextName = editStationName.trim();
+      const prevName = editingStation.name || "";
+
+      batch.update(doc(db, "stations", editingStation.id), {
+        name: nextName,
+        address: editStationAddress.trim(),
+        addressNormalized: editStationAddress.trim().toLowerCase(),
+      });
+
+      if (nextName !== prevName) {
+        const [teamsSnap, vehiclesSnap, usersSnap] = await Promise.all([
+          getDocs(query(collection(db, "teams"), where("stationId", "==", editingStation.id))),
+          getDocs(query(collection(db, "vehicles"), where("stationId", "==", editingStation.id))),
+          getDocs(query(collection(db, "users"), where("stationId", "==", editingStation.id))),
+        ]);
+
+        teamsSnap.docs.forEach((teamDoc) => {
+          batch.update(doc(db, "teams", teamDoc.id), {
+            stationName: nextName,
+          });
+        });
+
+        vehiclesSnap.docs.forEach((vehicleDoc) => {
+          batch.update(doc(db, "vehicles", vehicleDoc.id), {
+            stationName: nextName,
+          });
+        });
+
+        usersSnap.docs.forEach((userDoc) => {
+          batch.update(doc(db, "users", userDoc.id), {
+            stationName: nextName,
+          });
+        });
+      }
+
+      await batch.commit();
+      closeEditStation();
+      setSuccessMessage("Station updated successfully.");
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("Failed to update station.");
+    }
+  };
+
+  const removeVehicleFromStation = async (vehicleId: string) => {
+    if (!editingStation) {
+      return;
+    }
+
+    const station = stations.find((item) => item.id === editingStation.id);
+    const vehicle = vehicles.find((item) => item.id === vehicleId);
+
+    if (!station || !vehicle) {
+      setErrorMessage("Station or vehicle not found.");
+      return;
+    }
+
+    const targetTeamById = vehicle.assignedTeamId
+      ? teams.find((item) => item.id === vehicle.assignedTeamId)
+      : null;
+
+    const targetTeamByName = !targetTeamById && vehicle.assignedTeam
+      ? teams.find((item) => item.teamName === vehicle.assignedTeam)
+      : null;
+
+    const targetTeam = targetTeamById || targetTeamByName;
+
+    try {
+      const nextVehicleIds = (station.vehicleIds || []).filter((id) => id !== vehicleId);
+      const nextVehicleCodes = (station.vehicleCodes || []).filter(
+        (code) => code !== vehicle.code
+      );
+      const nextTeamIds = targetTeam
+        ? (station.teamIds || []).filter((id) => id !== targetTeam.id)
+        : station.teamIds || [];
+      const nextTeamNames = targetTeam
+        ? (station.teamNames || []).filter((name) => name !== targetTeam.teamName)
+        : station.teamNames || [];
+
+      const batch = writeBatch(db);
+
+      batch.update(doc(db, "stations", station.id), {
+        teamIds: nextTeamIds,
+        teamNames: nextTeamNames,
+        vehicleIds: nextVehicleIds,
+        vehicleCodes: nextVehicleCodes,
+      });
+
+      batch.update(doc(db, "vehicles", vehicle.id), {
+        stationId: "",
+        stationName: "",
+      });
+
+      if (targetTeam) {
+        batch.update(doc(db, "teams", targetTeam.id), {
+          stationId: "",
+          stationName: "",
+        });
+      }
+
+      const usersSnap = await getDocs(
+        query(collection(db, "users"), where("stationId", "==", station.id))
+      );
+
+      usersSnap.docs.forEach((userDoc) => {
+        const userData = userDoc.data() as Record<string, unknown>;
+        const sameVehicle = userData.vehicleId === vehicle.id;
+        const sameTeam = targetTeam
+          ? userData.teamId === targetTeam.id || userData.teamName === targetTeam.teamName
+          : false;
+
+        if (sameVehicle || sameTeam) {
+          batch.update(doc(db, "users", userDoc.id), {
+            stationId: "",
+            stationName: "",
+            vehicleId: "",
+            vehicleCode: "",
+            vehiclePlate: "",
+          });
+        }
+      });
+
+      await batch.commit();
+
+      setEditingStation((prev) => {
+        if (!prev || prev.id !== station.id) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          teamIds: nextTeamIds,
+          teamNames: nextTeamNames,
+          vehicleIds: nextVehicleIds,
+          vehicleCodes: nextVehicleCodes,
+        };
+      });
+
+      setSuccessMessage("Vehicle, linked team, and responders were removed from this station.");
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("Failed to remove vehicle assignment from station.");
     }
   };
 
@@ -383,7 +584,7 @@ export default function StationsPage() {
                 onChange={(e) => setSelectedVehicleId(e.target.value)}
               >
                 <option value="">Select vehicle</option>
-                {vehicles.map((vehicle) => (
+                {availableVehicles.map((vehicle) => (
                   <option key={vehicle.id} value={vehicle.id}>
                     {vehicle.code} {vehicle.plate ? `(${vehicle.plate})` : ""}
                     {vehicle.assignedTeam ? ` - ${vehicle.assignedTeam}` : ""}
@@ -391,6 +592,13 @@ export default function StationsPage() {
                 ))}
               </select>
             </div>
+
+            {availableVehicles.length === 0 && (
+              <p className={styles.helpText}>
+                All vehicles are currently assigned to stations. Edit a station to remove
+                assignments before adding another.
+              </p>
+            )}
 
             <p className={styles.helpText}>
               Team assignment is inferred from the selected vehicle. Make sure the vehicle has
@@ -432,12 +640,20 @@ export default function StationsPage() {
                           : "-"}
                       </td>
                       <td>
-                        <button
-                          className={styles.deleteBtn}
-                          onClick={() => deleteStation(station)}
-                        >
-                          Delete
-                        </button>
+                        <div className={styles.actionRow}>
+                          <button
+                            className={styles.editBtn}
+                            onClick={() => openEditStation(station)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className={styles.deleteBtn}
+                            onClick={() => deleteStation(station)}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -501,6 +717,69 @@ export default function StationsPage() {
               </button>
               <button className={styles.saveBtn} onClick={createStation}>
                 Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingStation && (
+        <div className={styles.modalOverlay} onClick={closeEditStation}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Edit Station</h3>
+            <label className={styles.label}>Station Name</label>
+            <input
+              className={styles.input}
+              value={editStationName}
+              onChange={(e) => setEditStationName(e.target.value)}
+              placeholder="Station Alpha"
+            />
+
+            <label className={styles.label}>Complete Station Address</label>
+            <input
+              className={styles.input}
+              value={editStationAddress}
+              onChange={(e) => setEditStationAddress(e.target.value)}
+              placeholder="House No., Street, Barangay, City, Province"
+            />
+
+            <label className={styles.label}>Assigned Vehicles</label>
+            <div className={styles.assignedList}>
+              {editingStationVehicleIds.length === 0 ? (
+                <p className={styles.helpText}>No assigned vehicles in this station.</p>
+              ) : (
+                editingStationVehicleIds.map((vehicleId) => {
+                  const vehicle = vehicles.find((item) => item.id === vehicleId);
+                  const label = vehicle
+                    ? `${vehicle.code} ${vehicle.plate ? `(${vehicle.plate})` : ""}`
+                    : vehicleId;
+
+                  return (
+                    <div key={vehicleId} className={styles.assignedItem}>
+                      <span>{label}</span>
+                      <button
+                        className={styles.removeBtn}
+                        type="button"
+                        onClick={() => removeVehicleFromStation(vehicleId)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <p className={styles.helpText}>
+              Removing a vehicle also removes its linked team and responders from this station.
+            </p>
+
+            <div className={styles.modalActions}>
+              <button className={styles.closeBtn} onClick={closeEditStation}>
+                Close
+              </button>
+              <button className={styles.saveBtn} onClick={saveEditedStation}>
+                Save Changes
               </button>
             </div>
           </div>

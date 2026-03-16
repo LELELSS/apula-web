@@ -37,7 +37,9 @@
 .assignBtn,
 .saveBtn,
 .closeBtn,
-.deleteBtn {
+.deleteBtn,
+.editBtn,
+.removeBtn {
   border: none;
   border-radius: 8px;
   padding: 10px 14px;
@@ -74,6 +76,25 @@
 
 .deleteBtn:hover {
   background: #b91c1c;
+}
+
+.editBtn {
+  background: #2563eb;
+  color: #fff;
+}
+
+.editBtn:hover {
+  background: #1d4ed8;
+}
+
+.removeBtn {
+  background: #f97316;
+  color: #fff;
+  padding: 8px 12px;
+}
+
+.removeBtn:hover {
+  background: #ea580c;
 }
 
 .assignCard {
@@ -157,6 +178,12 @@
   overflow-x: auto;
 }
 
+.actionRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .dataTable {
   width: 100%;
   border-collapse: collapse;
@@ -211,6 +238,29 @@
   margin-bottom: 6px;
   color: #444;
   font-weight: 600;
+}
+
+.assignedList {
+  margin-top: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  max-height: 180px;
+  overflow-y: auto;
+  background: #fafafa;
+}
+
+.assignedItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.assignedItem + .assignedItem {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eceff1;
 }
 
 .modalActions {

@@ -54,6 +54,21 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
+  if (pathname.startsWith("/dashboard/admin-activity")) {
+    if (!session) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("reason", "session-expired");
+
+      const response = NextResponse.redirect(loginUrl);
+      response.cookies.delete(SESSION_COOKIE_NAME);
+      return response;
+    }
+
+    if (session.role !== "superadmin") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+  }
+
   if (pathname.startsWith("/dashboard")) {
     const response = NextResponse.next();
     response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");

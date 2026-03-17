@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import styles from "./adminheaderstyles.module.css";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -29,6 +29,7 @@ import {
   collection,
   onSnapshot,
 } from "firebase/firestore";
+import { logActivity } from "@/lib/activityLog";
 
 export default function AdminHeader() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -42,6 +43,7 @@ export default function AdminHeader() {
   // 🔊 SOUND STATES
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const lastLoggedPathRef = useRef<string>("");
 
   const toggleSidebar = () => setSidebarOpen((prev) => !prev);
   const isActive = (path: string) => pathname === path;
@@ -155,6 +157,35 @@ export default function AdminHeader() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (role !== "admin") {
+      return;
+    }
+
+    if (!pathname || lastLoggedPathRef.current === pathname) {
+      return;
+    }
+
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      return;
+    }
+
+    lastLoggedPathRef.current = pathname;
+
+    logActivity({
+      actorUid: currentUser.uid,
+      actorEmail: currentUser.email || "",
+      actorName: userName,
+      actorRole: role,
+      action: "page_visit",
+      targetType: "route",
+      targetId: pathname,
+      details: `Visited ${pathname}`,
+      path: pathname,
+    });
+  }, [pathname, role, userName]);
+
   return (
     <>
       {/* Sidebar */}
@@ -198,8 +229,7 @@ export default function AdminHeader() {
             </div>
           </a>
 
-          {/* SUPER ADMIN ONLY */}
-          {role === "superadmin" && (
+          {(role === "superadmin" || role === "admin") && (
             <a
               href="/dashboard/users"
               className={`${styles.sidebarLink} ${isActive("/dashboard/users") ? styles.activeLink : ""}`}
@@ -207,6 +237,17 @@ export default function AdminHeader() {
             >
               <Users size={18} className={styles.icon} />
               <span>Users</span>
+            </a>
+          )}
+
+          {role === "superadmin" && (
+            <a
+              href="/dashboard/admin-activity"
+              className={`${styles.sidebarLink} ${isActive("/dashboard/admin-activity") ? styles.activeLink : ""}`}
+              onClick={() => setSidebarOpen(false)}
+            >
+              <ClipboardList size={18} className={styles.icon} />
+              <span>Admin Activity</span>
             </a>
           )}
 

@@ -13,6 +13,7 @@ import {
   doc,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { logActivity } from "@/lib/activityLog";
 
 import { FaUserCheck, FaUserTimes, FaSearch } from "react-icons/fa";
 import styles from "./responderRequest.module.css";
@@ -72,7 +73,7 @@ const ResponderRequestsPage = () => {
   }, []);
 
   useEffect(() => {
-    if (checkingRole || currentRole !== "superadmin") {
+    if (checkingRole || (currentRole !== "superadmin" && currentRole !== "admin")) {
       return;
     }
 
@@ -83,7 +84,10 @@ const ResponderRequestsPage = () => {
           .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Responder))
           .filter((item) => {
             const role = String(item.role || "").toLowerCase();
-            const isRequestRole = role === "responder" || role === "admin";
+            const isRequestRole =
+              currentRole === "superadmin"
+                ? role === "responder" || role === "admin"
+                : role === "responder";
             const verified = item.verified === true;
             const pendingApproval = item.approved === false;
             const notDeclined = String(item.status || "").toLowerCase() !== "declined";
@@ -118,20 +122,47 @@ const ResponderRequestsPage = () => {
       const ref = doc(db, "users", responder.id);
 
       if (action === "accept") {
+        if (currentRole !== "superadmin" && String(responder.role || "").toLowerCase() === "admin") {
+          setErrorMessage("Only super admin can approve admin account requests.");
+          setConfirmAction(null);
+          return;
+        }
+
         await updateDoc(ref, {
           approved: true,
           status: responder.role === "responder" ? "Available" : "Approved",
         });
       } else {
+        if (currentRole !== "superadmin" && String(responder.role || "").toLowerCase() === "admin") {
+          setErrorMessage("Only super admin can decline admin account requests.");
+          setConfirmAction(null);
+          return;
+        }
+
         await updateDoc(ref, {
           approved: false,
           status: "Declined",
         });
       }
 
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await logActivity({
+          actorUid: currentUser.uid,
+          actorEmail: currentUser.email || "",
+          actorName: currentUser.displayName || "",
+          actorRole: currentRole,
+          action: action === "accept" ? "approve_account_request" : "decline_account_request",
+          targetId: responder.id,
+          targetType: String(responder.role || "user"),
+          details: `${action} ${responder.role || "account"} request (${responder.email || "no-email"})`,
+          path: "/dashboard/ResponderRequest",
+        });
+      }
+
       setResponders((prev) => prev.filter((r) => r.id !== responder.id));
       setSuccessMessage(
-        `${responder.name ?? "Responder"} has been ${
+        `${responder.name ?? "Account"} has been ${
           action === "accept" ? "approved" : "declined"
         }.`
       );
@@ -159,12 +190,12 @@ const ResponderRequestsPage = () => {
             <h2 className={styles.pageTitle}>Checking access...</h2>
           </div>
         </div>
-      ) : currentRole !== "superadmin" ? (
+      ) : currentRole !== "superadmin" && currentRole !== "admin" ? (
         <div className={styles.container}>
           <div className={styles.contentSection}>
             <h2 className={styles.pageTitle}>Access Restricted</h2>
             <p className={styles.noResults}>
-              Only super admin can approve or decline account requests.
+              Only admin and super admin can access account permission requests.
             </p>
           </div>
         </div>

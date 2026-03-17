@@ -15,6 +15,7 @@ import {
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { logActivity } from "@/lib/activityLog";
 
 type User = {
   id: string;
@@ -440,6 +441,21 @@ export default function UsersPage() {
                   }
 
                   await updateDoc(doc(db, "users", editTarget.id), payload);
+
+                  const currentUser = auth.currentUser;
+                  if (currentUser && (norm(currentRole) === "admin" || norm(currentRole) === "superadmin")) {
+                    await logActivity({
+                      actorUid: currentUser.uid,
+                      actorEmail: currentUser.email || "",
+                      actorName: currentUser.displayName || "",
+                      actorRole: currentRole,
+                      action: "edit_user_account",
+                      targetId: editTarget.id,
+                      targetType: norm(editTarget.role) || "user",
+                      details: `Updated role/status to ${editTarget.role || "N/A"}/${editTarget.status || "N/A"}`,
+                      path: "/dashboard/users",
+                    });
+                  }
 
                   setUsers((prev) =>
                     prev.map((u) =>

@@ -1,0 +1,54 @@
+.pageWrap {
+  background: #e4e4e4;
+  min-height: 100vh;
+}
+
+.container {
+  padding: 20px;
+}
+
+.contentSection {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.pageTitle {
+  margin: 0;
+  color: #800000;
+  font-size: 1.5rem;
+}
+
+.separator {
+  margin: 12px 0 16px;
+  border: 0;
+  border-top: 1px solid #ddd;
+}
+
+.note {
+  color: #4b5563;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  background: #8b0000;
+  color: #fff;
+  text-align: left;
+  padding: 10px;
+}
+
+.table td {
+  border-bottom: 1px solid #eee;
+  padding: 10px;
+  color: #111;
+  vertical-align: top;
+}

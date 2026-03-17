@@ -5,13 +5,15 @@ import AdminHeader from "@/components/shared/adminHeader";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
 import styles from "./notificationStyles.module.css";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 import {
   collection,
   onSnapshot,
   updateDoc,
   doc,
+  arrayUnion,
 } from "firebase/firestore";
 
 const normalizeStatus = (value: unknown) => String(value || "").trim().toLowerCase();
@@ -46,7 +48,7 @@ const timestampToMillis = (value: any) => {
   return 0;
 };
 
-const normalizeNotification = (id: string, data: any, source: "alerts" | "backup_requests") => ({
+const normalizeNotification = (id: string, data: any, source: "alerts" | "backup_requests" | "notifications") => ({
   id,
   ...data,
   __source: source,
@@ -55,7 +57,7 @@ const normalizeNotification = (id: string, data: any, source: "alerts" | "backup
     data?.type ||
     data?.alertType ||
     data?.requestType ||
-    (source === "backup_requests" ? "Backup Request" : "Fire Alert"),
+    (source === "backup_requests" ? "Backup Request" : source === "notifications" ? "Monitoring Notice" : "Fire Alert"),
   location:
     data?.location ||
     data?.alertLocation ||
@@ -88,6 +90,7 @@ const normalizeNotification = (id: string, data: any, source: "alerts" | "backup
   description:
     data?.description ||
     data?.reason ||
+    data?.details ||
     data?.message ||
     "",
   timestamp:
@@ -103,6 +106,23 @@ const normalizeNotification = (id: string, data: any, source: "alerts" | "backup
     "Pending",
 });
 
+const isReadByUser = (notif: any, uid: string) => {
+  const readers = Array.isArray(notif?.readBy) ? notif.readBy : [];
+  return readers.includes(uid);
+};
+
+const getNotificationTag = (notif: any) => {
+  if (notif?.__source === "notifications") {
+    return { label: "System Notice", className: "typeSystem" };
+  }
+
+  if (notif?.__isBackupRequest || notif?.__source === "backup_requests") {
+    return { label: "Backup Request", className: "typeBackup" };
+  }
+
+  return { label: "Fire Alert", className: "typeFire" };
+};
+
 const NotificationPage: React.FC = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [selectedNotif, setSelectedNotif] = useState<any>(null);
@@ -112,6 +132,7 @@ const NotificationPage: React.FC = () => {
   /* 🔊 SOUND STATES */
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentUid, setCurrentUid] = useState("");
 
   /* PAGINATION */
   const [currentPage, setCurrentPage] = useState(1);
@@ -126,11 +147,20 @@ const NotificationPage: React.FC = () => {
 
   /* REALTIME ALERT LISTENER */
   useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setCurrentUid(user?.uid || "");
+    });
+
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
     let latestAlerts: any[] = [];
     let latestBackupRequests: any[] = [];
+    let latestSystemNotifs: any[] = [];
 
     const syncNotifications = () => {
-      const merged = [...latestAlerts, ...latestBackupRequests].sort(
+      const merged = [...latestAlerts, ...latestBackupRequests, ...latestSystemNotifs].sort(
         (a, b) => timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp)
       );
       setNotifications(merged);
@@ -156,9 +186,21 @@ const NotificationPage: React.FC = () => {
       (err) => console.error("backup_requests onSnapshot error:", err)
     );
 
+    const unsubscribeSystemNotifs = onSnapshot(
+      collection(db, "notifications"),
+      (snapshot) => {
+        latestSystemNotifs = snapshot.docs.map((d) =>
+          normalizeNotification(d.id, d.data(), "notifications")
+        );
+        syncNotifications();
+      },
+      (err) => console.error("notifications onSnapshot error:", err)
+    );
+
     return () => {
       unsubscribeAlerts();
       unsubscribeBackupRequests();
+      unsubscribeSystemNotifs();
     };
   }, []);
 
@@ -166,7 +208,9 @@ const NotificationPage: React.FC = () => {
   useEffect(() => {
     if (!audio) return;
 
-    const hasUnread = notifications.some((n) => !n.read);
+    const hasUnread = currentUid
+      ? notifications.some((n) => !isReadByUser(n, currentUid))
+      : false;
 
     if (hasUnread && !isPlaying) {
       audio.play().catch(() => {});
@@ -178,7 +222,7 @@ const NotificationPage: React.FC = () => {
       audio.currentTime = 0;
       setIsPlaying(false);
     }
-  }, [notifications, audio]);
+  }, [notifications, audio, currentUid]);
 
   /* RESET PAGE WHEN FILTER CHANGES */
   useEffect(() => {
@@ -191,7 +235,11 @@ const NotificationPage: React.FC = () => {
     setShowModal(true);
 
     try {
-      await updateDoc(doc(db, notif.__source || "alerts", notif.id), { read: true });
+      if (currentUid) {
+        await updateDoc(doc(db, notif.__source || "alerts", notif.id), {
+          readBy: arrayUnion(currentUid),
+        });
+      }
     } catch (error) {
       console.error("Failed to mark alert as read:", error);
     }
@@ -201,8 +249,9 @@ const NotificationPage: React.FC = () => {
 
   /* FILTER LOGIC */
   const filteredNotifications = notifications.filter((n) => {
-    if (filter === "read") return n.read;
-    if (filter === "unread") return !n.read;
+    const isRead = currentUid ? isReadByUser(n, currentUid) : false;
+    if (filter === "read") return isRead;
+    if (filter === "unread") return !isRead;
     return true;
   });
 
@@ -257,20 +306,31 @@ const NotificationPage: React.FC = () => {
               <p className={styles.noNotif}>No notifications found.</p>
             ) : (
               paginatedNotifications.map((notif) => (
+                (() => {
+                  const notifTag = getNotificationTag(notif);
+                  return (
                 <div
                   key={notif.id}
                   onClick={() => handleOpenModal(notif)}
                   className={`${styles.notificationCard} ${
-                    notif.read ? styles.read : styles.unread
+                    currentUid && isReadByUser(notif, currentUid) ? styles.read : styles.unread
                   }`}
                 >
                   <div className={styles.notifInfo}>
-                    <h4>
-                      {notif.__isBackupRequest ? "Backup Request" : notif.type}
-                      {!notif.read && (
-                        <span className={styles.unreadDot}></span>
-                      )}
-                    </h4>
+                    <div className={styles.notifTitleRow}>
+                      <h4>
+                        {notif.__isBackupRequest ? "Backup Request" : notif.type}
+                        {!(currentUid && isReadByUser(notif, currentUid)) && (
+                          <span className={styles.unreadDot}></span>
+                        )}
+                      </h4>
+
+                      <span
+                        className={`${styles.notifTypeTag} ${styles[notifTag.className]}`}
+                      >
+                        {notifTag.label}
+                      </span>
+                    </div>
 
                     <p>
                       <strong>Location:</strong>{" "}
@@ -306,6 +366,8 @@ const NotificationPage: React.FC = () => {
                     {notif.status}
                   </span>
                 </div>
+                  );
+                })()
               ))
             )}
           </div>

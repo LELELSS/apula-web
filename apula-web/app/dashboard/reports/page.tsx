@@ -29,6 +29,10 @@ type ReportItem = {
   userAddress?: string;
   status?: string;
   timestamp?: { seconds: number };
+  monitoringStatus?: string;
+  monitoringMessage?: string;
+  monitoringUpdatedAt?: { seconds: number };
+  monitoredBy?: string;
 };
 
 type ResponderItem = {
@@ -541,6 +545,31 @@ const ReportPage = () => {
                       {new Date(
                         dispatches[0].timestamp.seconds * 1000
                       ).toLocaleString()}
+                    </p>
+                  )}
+
+                  {selectedReport.monitoringStatus && (
+                    <p>
+                      <strong>Monitoring Status:</strong> {selectedReport.monitoringStatus}
+                    </p>
+                  )}
+
+                  {selectedReport.monitoringMessage && (
+                    <p>
+                      <strong>Monitoring Note:</strong> {selectedReport.monitoringMessage}
+                    </p>
+                  )}
+
+                  {selectedReport.monitoredBy && (
+                    <p>
+                      <strong>Monitored By:</strong> {selectedReport.monitoredBy}
+                    </p>
+                  )}
+
+                  {selectedReport.monitoringUpdatedAt?.seconds && (
+                    <p>
+                      <strong>Monitoring Updated At:</strong>{" "}
+                      {new Date(selectedReport.monitoringUpdatedAt.seconds * 1000).toLocaleString()}
                     </p>
                   )}
                 </div>

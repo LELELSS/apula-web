@@ -39,6 +39,7 @@ export default function AdminHeader() {
   const pathname = usePathname();
 
   const [unreadCount, setUnreadCount] = useState(0);
+  const [currentUid, setCurrentUid] = useState("");
 
   // 🔊 SOUND STATES
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
@@ -79,6 +80,11 @@ export default function AdminHeader() {
 
   // 🔥 Realtime unread count (GLOBAL)
   useEffect(() => {
+    if (!currentUid) {
+      setUnreadCount(0);
+      return;
+    }
+
     let alertUnread = 0;
     let backupUnread = 0;
 
@@ -89,7 +95,8 @@ export default function AdminHeader() {
     const unsubscribeAlerts = onSnapshot(collection(db, "alerts"), (snapshot) => {
       alertUnread = snapshot.docs.reduce((count, docSnap) => {
         const data = docSnap.data() as Record<string, unknown>;
-        return data.read === true ? count : count + 1;
+        const readers = Array.isArray(data.readBy) ? (data.readBy as string[]) : [];
+        return readers.includes(currentUid) ? count : count + 1;
       }, 0);
       syncUnread();
     });
@@ -97,7 +104,8 @@ export default function AdminHeader() {
     const unsubscribeBackup = onSnapshot(collection(db, "backup_requests"), (snapshot) => {
       backupUnread = snapshot.docs.reduce((count, docSnap) => {
         const data = docSnap.data() as Record<string, unknown>;
-        return data.read === true ? count : count + 1;
+        const readers = Array.isArray(data.readBy) ? (data.readBy as string[]) : [];
+        return readers.includes(currentUid) ? count : count + 1;
       }, 0);
       syncUnread();
     });
@@ -106,7 +114,7 @@ export default function AdminHeader() {
       unsubscribeAlerts();
       unsubscribeBackup();
     };
-  }, []);
+  }, [currentUid]);
 
   // 🔊 Play or stop sound based on unreadCount (GLOBAL)
   useEffect(() => {
@@ -130,8 +138,11 @@ export default function AdminHeader() {
       if (!user) {
         setUserName("Guest");
         setInitial(getFirstNameInitial("Guest"));
+        setCurrentUid("");
         return;
       }
+
+      setCurrentUid(user.uid);
 
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));

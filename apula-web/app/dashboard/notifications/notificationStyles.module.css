@@ -117,6 +117,44 @@
   word-break: break-word;
 }
 
+.notifTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.notifTypeTag {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.typeFire {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.typeBackup {
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+
+.typeSystem {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
 .notifInfo p {
   font-size: 13px;
   margin: 3px 0;
@@ -517,6 +555,15 @@
     align-items: flex-start;
     padding: 14px;
     gap: 10px;
+  }
+
+  .notifTitleRow {
+    width: 100%;
+  }
+
+  .notifTypeTag {
+    font-size: 10px;
+    padding: 4px 8px;
   }
 
   .statusBadge {

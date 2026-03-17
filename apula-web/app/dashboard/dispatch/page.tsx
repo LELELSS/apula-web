@@ -16,11 +16,14 @@ import {
   onSnapshot,
   serverTimestamp,
   writeBatch,
+  addDoc,
+  updateDoc,
 } from "firebase/firestore";
 
 import { auth, db } from "@/lib/firebase";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
+import { logActivity } from "@/lib/activityLog";
 
 const normalizeStatus = (value: unknown) => String(value || "").trim().toLowerCase();
 
@@ -329,6 +332,7 @@ const latest = snap.docs
     if (respondersList.length === 0) return alert("No available responders selected.");
 
     try {
+      const baseAlertId = selectedAlert.__baseAlertId || selectedAlert.alertId || selectedAlert.id;
       const batch = writeBatch(db);
       const currentUser = auth.currentUser;
 
@@ -351,11 +355,61 @@ const latest = snap.docs
 
       const responderEmails = respondersList.map((r) => (r.email || "").toLowerCase());
 
+      const existingDispatchesSnap = await getDocs(
+        query(collection(db, "dispatches"), where("alertId", "==", baseAlertId))
+      );
+
+      const alreadyMonitored = existingDispatchesSnap.docs.some(
+        (docSnap) => String((docSnap.data() as any)?.status || "") === "Dispatched"
+      );
+
+      if (alreadyMonitored) {
+        await addDoc(collection(db, "notifications"), {
+          type: "Monitoring Notice",
+          status: "Monitored",
+          message: "This fire event is already being monitored by another dispatch team.",
+          alertId: baseAlertId,
+          location: selectedAlert.location || selectedAlert.userAddress || "",
+          userName: selectedAlert.userName || "System",
+          userAddress: selectedAlert.userAddress || selectedAlert.location || "",
+          userContact: selectedAlert.userContact || "",
+          userEmail: selectedAlert.userEmail || "",
+          readBy: [],
+          timestamp: serverTimestamp(),
+          createdAt: serverTimestamp(),
+        });
+
+        try {
+          await updateDoc(doc(db, "alerts", baseAlertId), {
+            monitoringStatus: "Monitored",
+            monitoringMessage: "Duplicate dispatch attempt blocked because event is already monitored.",
+            monitoringUpdatedAt: serverTimestamp(),
+          });
+        } catch {}
+
+        if (currentUser) {
+          await logActivity({
+            actorUid: currentUser.uid,
+            actorEmail: currentUser.email || "",
+            actorName: dispatchedByName,
+            actorRole: "admin",
+            action: "dispatch_blocked_already_monitored",
+            targetId: String(baseAlertId),
+            targetType: "alert",
+            details: "Blocked duplicate dispatch because alert is already monitored.",
+            path: "/dashboard/dispatch",
+          });
+        }
+
+        alert("This fire event is already being monitored.");
+        return;
+      }
+
       // create dispatch document
       const dispatchRef = doc(collection(db, "dispatches"));
 
       batch.set(dispatchRef, {
-        alertId: selectedAlert.__baseAlertId || selectedAlert.alertId || selectedAlert.id,
+        alertId: baseAlertId,
         backupRequestId: selectedAlert.__isBackupRequest ? selectedAlert.id : "",
         alertType: selectedAlert.type,
         alertLocation: selectedAlert.location,
@@ -427,6 +481,44 @@ const latest = snap.docs
       });
 
       await batch.commit();
+
+      await addDoc(collection(db, "notifications"), {
+        type: "Monitoring Notice",
+        status: "Monitored",
+        message: `Fire event is now being monitored by ${dispatchedByName}.`,
+        alertId: baseAlertId,
+        location: selectedAlert.location || selectedAlert.userAddress || "",
+        userName: selectedAlert.userName || "System",
+        userAddress: selectedAlert.userAddress || selectedAlert.location || "",
+        userContact: selectedAlert.userContact || "",
+        userEmail: selectedAlert.userEmail || "",
+        readBy: [],
+        timestamp: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      });
+
+      try {
+        await updateDoc(doc(db, "alerts", baseAlertId), {
+          monitoringStatus: "Monitored",
+          monitoringMessage: `Fire event is being monitored by ${dispatchedByName}.`,
+          monitoringUpdatedAt: serverTimestamp(),
+          monitoredBy: dispatchedByName,
+        });
+      } catch {}
+
+      if (currentUser) {
+        await logActivity({
+          actorUid: currentUser.uid,
+          actorEmail: currentUser.email || "",
+          actorName: dispatchedByName,
+          actorRole: "admin",
+          action: "dispatch_event_monitored",
+          targetId: String(baseAlertId),
+          targetType: "alert",
+          details: "Dispatched responders and marked event as monitored.",
+          path: "/dashboard/dispatch",
+        });
+      }
 
       setShowResponderModal(false);
       setSelectedResponderIds(new Set());

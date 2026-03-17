@@ -245,7 +245,6 @@ export default function UsersPage() {
                   <th>ID</th>
                   <th>Name</th>
                   <th>Role</th>
-                  <th>Status</th>
                   <th>Contact</th>
                   <th>Actions</th>
                 </tr>
@@ -264,7 +263,6 @@ export default function UsersPage() {
                       <td data-label="ID">{user.id}</td>
                       <td data-label="Name">{user.name ?? "N/A"}</td>
                       <td data-label="Role">{user.role ?? "N/A"}</td>
-                      <td data-label="Status">{user.status ?? "N/A"}</td>
                       <td data-label="Contact">{user.contact ?? "N/A"}</td>
                       <td data-label="Actions" className={styles.actionCell}>
                         <button

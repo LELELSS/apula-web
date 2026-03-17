@@ -17,6 +17,126 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
+const normalizeStatus = (value: unknown) => String(value || "").trim().toLowerCase();
+
+const isOpenBackupRequest = (data: Record<string, unknown>) => {
+  const status =
+    normalizeStatus(data.status) ||
+    normalizeStatus(data.requestStatus) ||
+    normalizeStatus(data.backupStatus) ||
+    normalizeStatus(data.dispatchStatus);
+
+  if (
+    status === "resolved" ||
+    status === "closed" ||
+    status === "completed" ||
+    status === "done" ||
+    status === "dispatched" ||
+    status === "accepted" ||
+    status === "declined" ||
+    status === "cancelled" ||
+    status === "canceled"
+  ) {
+    return false;
+  }
+
+  if (
+    status === "pending" ||
+    status === "active" ||
+    status === "open" ||
+    status === "requested" ||
+    status === "waiting" ||
+    status === "new"
+  ) {
+    return true;
+  }
+
+  if (typeof data.resolved === "boolean") return !data.resolved;
+  if (typeof data.isResolved === "boolean") return !data.isResolved;
+  if (typeof data.completed === "boolean") return !data.completed;
+  if (typeof data.isCompleted === "boolean") return !data.isCompleted;
+
+  return true;
+};
+
+const timestampToMillis = (value: any) => {
+  if (!value) return 0;
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const normalizeIncident = (id: string, data: any, source: "alerts" | "backupRequests") => {
+  const type =
+    data?.type ||
+    data?.alertType ||
+    data?.requestType ||
+    data?.backupType ||
+    (source === "backupRequests" ? "Backup Request" : "Fire Alert");
+
+  const userName =
+    data?.userName ||
+    data?.reportedBy ||
+    data?.requestedBy ||
+    data?.requesterName ||
+    data?.name ||
+    "Unknown";
+
+  const userContact =
+    data?.userContact ||
+    data?.contact ||
+    data?.phone ||
+    data?.mobile ||
+    data?.requesterContact ||
+    "";
+
+  const userAddress =
+    data?.userAddress ||
+    data?.location ||
+    data?.alertLocation ||
+    data?.address ||
+    data?.requestAddress ||
+    data?.stationAddress ||
+    data?.stationName ||
+    "";
+
+  const location =
+    data?.location ||
+    data?.alertLocation ||
+    data?.userAddress ||
+    data?.address ||
+    data?.requestAddress ||
+    userAddress;
+
+  return {
+    id,
+    ...data,
+    __source: source,
+    __isBackupRequest: source === "backupRequests",
+    type,
+    userName,
+    userContact,
+    userAddress,
+    location,
+    status:
+      data?.status ||
+      data?.requestStatus ||
+      data?.backupStatus ||
+      data?.dispatchStatus ||
+      (source === "backupRequests" ? "Pending" : data?.status),
+    timestamp:
+      data?.timestamp ||
+      data?.requestedAt ||
+      data?.createdAt ||
+      data?.updatedAt ||
+      null,
+  };
+};
+
 const AlertDispatchModal = () => {
   const [showModal, setShowModal] = useState(false);
 
@@ -158,14 +278,30 @@ const AlertDispatchModal = () => {
   // LOAD PENDING ALERTS
   // ------------------------------------------------------------
   const loadAlerts = async () => {
-    const snap = await getDocs(
-      query(
-        collection(db, "alerts"),
-        where("status", "==", "Pending"),
-        orderBy("timestamp", "desc")
-      )
+    const [alertSnap, backupSnap] = await Promise.all([
+      getDocs(
+        query(
+          collection(db, "alerts"),
+          where("status", "==", "Pending"),
+          orderBy("timestamp", "desc")
+        )
+      ),
+      getDocs(collection(db, "backupRequests")),
+    ]);
+
+    const pendingAlerts = alertSnap.docs.map((d) =>
+      normalizeIncident(d.id, d.data(), "alerts")
     );
-    setAlerts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+
+    const pendingBackupRequests = backupSnap.docs
+      .map((d) => normalizeIncident(d.id, d.data(), "backupRequests"))
+      .filter((item) => isOpenBackupRequest(item as Record<string, unknown>));
+
+    const nextAlerts = [...pendingBackupRequests, ...pendingAlerts].sort(
+      (a, b) => timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp)
+    );
+
+    setAlerts(nextAlerts);
   };
 
   // ------------------------------------------------------------
@@ -559,6 +695,9 @@ const getTeamStationName = (teamName: string) => {
         alertLocation: selectedAlert.location,
         snapshotUrl: selectedAlert.snapshotUrl || null,
         snapshotBase64: selectedAlert.snapshotBase64 || null,
+        dispatchType: selectedAlert.__isBackupRequest ? "Backup" : "Primary",
+        isBackup: Boolean(selectedAlert.__isBackupRequest),
+        requestSource: selectedAlert.__source || "alerts",
 
         responders: selected.map((r) => {
           const teamName =
@@ -595,8 +734,10 @@ const getTeamStationName = (teamName: string) => {
       );
 
       // Update alert → Dispatched
-      batch.update(doc(db, "alerts", selectedAlert.id), {
+      batch.update(doc(db, selectedAlert.__source || "alerts", selectedAlert.id), {
         status: "Dispatched",
+        dispatchStatus: "Dispatched",
+        respondedAt: serverTimestamp(),
       });
 
       // ------------------------------------------------------------
@@ -685,10 +826,15 @@ const getTeamStationName = (teamName: string) => {
           <>
             <h3 className={styles.modalTitle}>Select Alert</h3>
 
+            {alerts.length === 0 && (
+              <p className={styles.distanceInfo}>No pending alerts or backup requests found.</p>
+            )}
+
             <div className={styles.tableScroll}>
               <table className={styles.alertTable}>
                 <thead>
                   <tr>
+                    <th>Type</th>
                     <th>Reporter</th>
                     <th>Contact</th>
                     <th>Address</th>
@@ -699,6 +845,7 @@ const getTeamStationName = (teamName: string) => {
                 <tbody>
                   {alerts.map((a) => (
                     <tr key={a.id}>
+                      <td>{a.__isBackupRequest ? "Backup Request" : a.type}</td>
                       <td>{a.userName}</td>
                       <td>{a.userContact}</td>
                       <td>{a.userAddress}</td>

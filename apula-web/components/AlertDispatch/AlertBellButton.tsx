@@ -6,6 +6,48 @@ import styles from "./alertBellButton.module.css";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 
+const normalizeStatus = (value: unknown) => String(value || "").trim().toLowerCase();
+
+const isOpenBackupRequest = (data: Record<string, unknown>) => {
+  const status =
+    normalizeStatus(data.status) ||
+    normalizeStatus(data.requestStatus) ||
+    normalizeStatus(data.backupStatus) ||
+    normalizeStatus(data.dispatchStatus);
+
+  if (
+    status === "resolved" ||
+    status === "closed" ||
+    status === "completed" ||
+    status === "done" ||
+    status === "dispatched" ||
+    status === "accepted" ||
+    status === "declined" ||
+    status === "cancelled" ||
+    status === "canceled"
+  ) {
+    return false;
+  }
+
+  if (
+    status === "pending" ||
+    status === "active" ||
+    status === "open" ||
+    status === "requested" ||
+    status === "waiting" ||
+    status === "new"
+  ) {
+    return true;
+  }
+
+  if (typeof data.resolved === "boolean") return !data.resolved;
+  if (typeof data.isResolved === "boolean") return !data.isResolved;
+  if (typeof data.completed === "boolean") return !data.completed;
+  if (typeof data.isCompleted === "boolean") return !data.isCompleted;
+
+  return true;
+};
+
 const AlertBellButton = () => {
   const [alertCount, setAlertCount] = useState(0);
   const [backupCount, setBackupCount] = useState(0);
@@ -37,13 +79,13 @@ const AlertBellButton = () => {
 
   // 🚒 Real-time listen to pending backup requests
   useEffect(() => {
-    const q = query(
-      collection(db, "backupRequests"),
-      where("status", "==", "Pending")
-    );
+    const unsub = onSnapshot(collection(db, "backupRequests"), (snap) => {
+      const openCount = snap.docs.reduce((count, docSnap) => {
+        const data = docSnap.data() as Record<string, unknown>;
+        return isOpenBackupRequest(data) ? count + 1 : count;
+      }, 0);
 
-    const unsub = onSnapshot(q, (snap) => {
-      setBackupCount(snap.size);
+      setBackupCount(openCount);
     });
 
     return () => unsub();

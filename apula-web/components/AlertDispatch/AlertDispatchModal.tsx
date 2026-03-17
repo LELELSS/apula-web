@@ -312,7 +312,7 @@ const AlertDispatchModal = () => {
       }
     });
 
-    const dispatchDocs = await Promise.all(
+    const dispatchDocs: Array<[string, any] | null> = await Promise.all(
       Array.from(dispatchIds).map(async (dispatchId) => {
         const docSnap = await getDoc(doc(db, "dispatches", dispatchId));
         return docSnap.exists() ? [dispatchId, docSnap.data()] : null;

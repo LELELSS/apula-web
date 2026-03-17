@@ -22,6 +22,79 @@ import { auth, db } from "@/lib/firebase";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
 
+const normalizeStatus = (value: unknown) => String(value || "").trim().toLowerCase();
+
+const isOpenBackupRequest = (data: Record<string, unknown>) => {
+  const status =
+    normalizeStatus(data.status) ||
+    normalizeStatus(data.requestStatus) ||
+    normalizeStatus(data.backupStatus) ||
+    normalizeStatus(data.dispatchStatus);
+
+  if (
+    status === "resolved" ||
+    status === "closed" ||
+    status === "completed" ||
+    status === "done" ||
+    status === "declined" ||
+    status === "cancelled" ||
+    status === "canceled"
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const timestampToMillis = (value: any) => {
+  if (!value) return 0;
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  return 0;
+};
+
+const normalizeIncident = (id: string, data: any, source: "alerts" | "backup_requests") => ({
+  id,
+  ...data,
+  __source: source,
+  __isBackupRequest: source === "backup_requests",
+  type:
+    data?.type ||
+    data?.alertType ||
+    data?.requestType ||
+    (source === "backup_requests" ? "Backup Request" : "Fire Alert"),
+  location:
+    data?.location ||
+    data?.alertLocation ||
+    data?.userAddress ||
+    data?.address ||
+    data?.stationName ||
+    "Unknown Location",
+  userName:
+    data?.userName ||
+    data?.requestedByName ||
+    data?.reportedBy ||
+    "Unknown",
+  userContact:
+    data?.userContact ||
+    data?.contact ||
+    data?.phone ||
+    data?.requestedByEmail ||
+    "",
+  userAddress:
+    data?.userAddress ||
+    data?.address ||
+    data?.location ||
+    data?.alertLocation ||
+    data?.stationName ||
+    "",
+  timestamp:
+    data?.timestamp ||
+    data?.createdAt ||
+    data?.requestedAt ||
+    null,
+});
+
 /**
  * DispatchPage
  *
@@ -78,7 +151,7 @@ const latest = snap.docs
   .map((d) => ({ id: d.id, ...(d.data() as Omit<DispatchRecord, "id">) }) as DispatchRecord)
   .find(d =>
     d.status === "Dispatched" &&
-    d.responders?.some((r: any) => r.teamName === teamName)
+    d.responders?.some((r: any) => r.teamName === teamName || r.team === teamName)
   );
 
 
@@ -186,11 +259,19 @@ const latest = snap.docs
   // Open alert modal (fetch pending alerts)
   // ---------------------------
   const openAlertModal = async () => {
-    const snap = await getDocs(
-      query(collection(db, "alerts"), where("status", "==", "Pending"), orderBy("timestamp", "desc"))
-    );
+    const [alertsSnap, backupSnap] = await Promise.all([
+      getDocs(
+        query(collection(db, "alerts"), where("status", "==", "Pending"), orderBy("timestamp", "desc"))
+      ),
+      getDocs(collection(db, "backup_requests")),
+    ]);
 
-    const pending = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const pending = [
+      ...alertsSnap.docs.map((d) => normalizeIncident(d.id, d.data(), "alerts")),
+      ...backupSnap.docs
+        .map((d) => normalizeIncident(d.id, d.data(), "backup_requests"))
+        .filter((item) => isOpenBackupRequest(item)),
+    ].sort((a, b) => timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp));
 
     if (pending.length === 0) {
       window.alert("No pending alerts found.");
@@ -276,6 +357,9 @@ const latest = snap.docs
         alertType: selectedAlert.type,
         alertLocation: selectedAlert.location,
         snapshotUrl: selectedAlert.snapshotUrl || null,
+        dispatchType: selectedAlert.__isBackupRequest ? "Backup" : "Primary",
+        isBackup: Boolean(selectedAlert.__isBackupRequest),
+        requestSource: selectedAlert.__source || "alerts",
         responders: respondersList.map((r) => ({
           id: r.id,
           name: r.name,
@@ -299,7 +383,10 @@ const latest = snap.docs
       });
 
       // update alert doc -> Dispatched
-      batch.update(doc(db, "alerts", selectedAlert.id), { status: "Dispatched" });
+      batch.update(
+        doc(db, selectedAlert.__source || "alerts", selectedAlert.id),
+        { status: "Dispatched", dispatchStatus: "Dispatched" }
+      );
 
       // update teams & vehicles to Dispatched
       const affectedTeamIds = new Set<string>();
@@ -541,6 +628,7 @@ const latest = snap.docs
               <table className={styles.alertTable}>
                 <thead>
                   <tr>
+                    <th>Type</th>
                     <th>Reporter</th>
                     <th>Contact</th>
                     <th>Address</th>
@@ -550,6 +638,7 @@ const latest = snap.docs
                 <tbody>
                   {alerts.map((a) => (
                     <tr key={a.id}>
+                      <td>{a.__isBackupRequest ? "Backup Request" : a.type}</td>
                       <td>{a.userName}</td>
                       <td>{a.userContact}</td>
                       <td>{a.userAddress}</td>

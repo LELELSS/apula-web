@@ -9,12 +9,98 @@ import { db } from "@/lib/firebase";
 
 import {
   collection,
-  query,
-  orderBy,
   onSnapshot,
   updateDoc,
   doc,
 } from "firebase/firestore";
+
+const normalizeStatus = (value: unknown) => String(value || "").trim().toLowerCase();
+
+const isOpenBackupRequest = (data: Record<string, unknown>) => {
+  const status =
+    normalizeStatus(data.status) ||
+    normalizeStatus(data.requestStatus) ||
+    normalizeStatus(data.backupStatus) ||
+    normalizeStatus(data.dispatchStatus);
+
+  if (
+    status === "resolved" ||
+    status === "closed" ||
+    status === "completed" ||
+    status === "done" ||
+    status === "declined" ||
+    status === "cancelled" ||
+    status === "canceled"
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const timestampToMillis = (value: any) => {
+  if (!value) return 0;
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  return 0;
+};
+
+const normalizeNotification = (id: string, data: any, source: "alerts" | "backup_requests") => ({
+  id,
+  ...data,
+  __source: source,
+  __isBackupRequest: source === "backup_requests",
+  type:
+    data?.type ||
+    data?.alertType ||
+    data?.requestType ||
+    (source === "backup_requests" ? "Backup Request" : "Fire Alert"),
+  location:
+    data?.location ||
+    data?.alertLocation ||
+    data?.userAddress ||
+    data?.address ||
+    data?.stationName ||
+    "Unknown Location",
+  userName:
+    data?.userName ||
+    data?.requestedByName ||
+    data?.reportedBy ||
+    "Unknown User",
+  userAddress:
+    data?.userAddress ||
+    data?.address ||
+    data?.location ||
+    data?.alertLocation ||
+    data?.stationName ||
+    "N/A",
+  userContact:
+    data?.userContact ||
+    data?.contact ||
+    data?.phone ||
+    data?.requestedByEmail ||
+    "N/A",
+  userEmail:
+    data?.userEmail ||
+    data?.requestedByEmail ||
+    "N/A",
+  description:
+    data?.description ||
+    data?.reason ||
+    data?.message ||
+    "",
+  timestamp:
+    data?.timestamp ||
+    data?.createdAt ||
+    data?.requestedAt ||
+    null,
+  status:
+    data?.status ||
+    data?.requestStatus ||
+    data?.backupStatus ||
+    data?.dispatchStatus ||
+    "Pending",
+});
 
 const NotificationPage: React.FC = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -39,21 +125,40 @@ const NotificationPage: React.FC = () => {
 
   /* REALTIME ALERT LISTENER */
   useEffect(() => {
-    const q = query(collection(db, "alerts"), orderBy("timestamp", "desc"));
+    let latestAlerts: any[] = [];
+    let latestBackupRequests: any[] = [];
 
-    const unsubscribe = onSnapshot(
-      q,
+    const syncNotifications = () => {
+      const merged = [...latestAlerts, ...latestBackupRequests].sort(
+        (a, b) => timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp)
+      );
+      setNotifications(merged);
+    };
+
+    const unsubscribeAlerts = onSnapshot(
+      collection(db, "alerts"),
       (snapshot) => {
-        const alerts = snapshot.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        }));
-        setNotifications(alerts);
+        latestAlerts = snapshot.docs.map((d) => normalizeNotification(d.id, d.data(), "alerts"));
+        syncNotifications();
       },
       (err) => console.error("alerts onSnapshot error:", err)
     );
 
-    return () => unsubscribe();
+    const unsubscribeBackupRequests = onSnapshot(
+      collection(db, "backup_requests"),
+      (snapshot) => {
+        latestBackupRequests = snapshot.docs.map((d) =>
+          normalizeNotification(d.id, d.data(), "backup_requests")
+        );
+        syncNotifications();
+      },
+      (err) => console.error("backup_requests onSnapshot error:", err)
+    );
+
+    return () => {
+      unsubscribeAlerts();
+      unsubscribeBackupRequests();
+    };
   }, []);
 
   /* SOUND LOGIC */
@@ -85,7 +190,7 @@ const NotificationPage: React.FC = () => {
     setShowModal(true);
 
     try {
-      await updateDoc(doc(db, "alerts", notif.id), { read: true });
+      await updateDoc(doc(db, notif.__source || "alerts", notif.id), { read: true });
     } catch (error) {
       console.error("Failed to mark alert as read:", error);
     }
@@ -160,7 +265,7 @@ const NotificationPage: React.FC = () => {
                 >
                   <div className={styles.notifInfo}>
                     <h4>
-                      {notif.type}
+                      {notif.__isBackupRequest ? "Backup Request" : notif.type}
                       {!notif.read && (
                         <span className={styles.unreadDot}></span>
                       )}
@@ -192,7 +297,7 @@ const NotificationPage: React.FC = () => {
 
                   <span
                     className={`${styles.statusBadge} ${
-                      notif.status === "Pending" || notif.status === "Active"
+                      notif.status === "Pending" || notif.status === "Active" || notif.status === "Open"
                         ? styles.statusPending
                         : styles.statusResolved
                     }`}
@@ -242,7 +347,7 @@ const NotificationPage: React.FC = () => {
             className={styles.modalContent}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3>Fire Alert Details</h3>
+            <h3>{selectedNotif.__isBackupRequest ? "Backup Request Details" : "Fire Alert Details"}</h3>
 
             <p>
               <strong>Location:</strong> {selectedNotif.location || "N/A"}

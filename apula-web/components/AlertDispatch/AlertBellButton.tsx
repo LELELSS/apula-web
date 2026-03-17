@@ -79,16 +79,45 @@ const AlertBellButton = () => {
 
   // 🚒 Real-time listen to pending backup requests
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "backupRequests"), (snap) => {
+    let latestSnakeCount = 0;
+    let latestCamelCount = 0;
+
+    const handleCountUpdate = (source: "snake" | "camel", count: number) => {
+      if (source === "snake") {
+        latestSnakeCount = count;
+      } else {
+        latestCamelCount = count;
+      }
+
+      setBackupCount(Math.max(latestSnakeCount, latestCamelCount));
+    };
+
+    const unsubSnake = onSnapshot(collection(db, "backup_requests"), (snap) => {
       const openCount = snap.docs.reduce((count, docSnap) => {
         const data = docSnap.data() as Record<string, unknown>;
         return isOpenBackupRequest(data) ? count + 1 : count;
       }, 0);
 
-      setBackupCount(openCount);
+      handleCountUpdate("snake", openCount);
     });
 
-    return () => unsub();
+    const unsubCamel = onSnapshot(
+      collection(db, "backupRequests"),
+      (snap) => {
+        const openCount = snap.docs.reduce((count, docSnap) => {
+          const data = docSnap.data() as Record<string, unknown>;
+          return isOpenBackupRequest(data) ? count + 1 : count;
+        }, 0);
+
+        handleCountUpdate("camel", openCount);
+      },
+      () => handleCountUpdate("camel", 0)
+    );
+
+    return () => {
+      unsubSnake();
+      unsubCamel();
+    };
   }, []);
 
   // 🔊 Play sound if alerts or backup requests exist

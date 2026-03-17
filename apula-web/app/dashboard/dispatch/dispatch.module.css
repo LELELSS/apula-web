@@ -161,6 +161,29 @@
   margin-bottom: 15px;
 }
 
+.modalTabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.modalTabBtn {
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modalTabBtnActive {
+  background: #800000;
+  color: #fff;
+  border-color: #800000;
+}
+
 /* SCROLLABLE AREA */
 .tableScroll {
   max-height: 400px;

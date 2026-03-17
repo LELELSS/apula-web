@@ -70,13 +70,13 @@ const timestampToMillis = (value: any) => {
   return 0;
 };
 
-const normalizeIncident = (id: string, data: any, source: "alerts" | "backupRequests") => {
+const normalizeIncident = (id: string, data: any, source: "alerts" | "backup_requests") => {
   const type =
     data?.type ||
     data?.alertType ||
     data?.requestType ||
     data?.backupType ||
-    (source === "backupRequests" ? "Backup Request" : "Fire Alert");
+    (source === "backup_requests" ? "Backup Request" : "Fire Alert");
 
   const userName =
     data?.userName ||
@@ -116,7 +116,7 @@ const normalizeIncident = (id: string, data: any, source: "alerts" | "backupRequ
     id,
     ...data,
     __source: source,
-    __isBackupRequest: source === "backupRequests",
+    __isBackupRequest: source === "backup_requests",
     type,
     userName,
     userContact,
@@ -127,7 +127,7 @@ const normalizeIncident = (id: string, data: any, source: "alerts" | "backupRequ
       data?.requestStatus ||
       data?.backupStatus ||
       data?.dispatchStatus ||
-      (source === "backupRequests" ? "Pending" : data?.status),
+      (source === "backup_requests" ? "Pending" : data?.status),
     timestamp:
       data?.timestamp ||
       data?.requestedAt ||
@@ -139,6 +139,7 @@ const normalizeIncident = (id: string, data: any, source: "alerts" | "backupRequ
 
 const AlertDispatchModal = () => {
   const [showModal, setShowModal] = useState(false);
+  const [activeIncidentTab, setActiveIncidentTab] = useState<"all" | "alerts" | "backup">("all");
 
   const [dispatchStep, setDispatchStep] = useState<1 | 2 | 3>(1);
 
@@ -244,7 +245,7 @@ const AlertDispatchModal = () => {
     .map((d) => ({ id: d.id, ...(d.data() as any) }))
     .find((d: any) =>
       d.status === "Dispatched" &&
-      d.responders?.some((r: any) => r.team === teamName)
+      d.responders?.some((r: any) => r.team === teamName || r.teamName === teamName)
     );
 
   if (!latest) {
@@ -265,6 +266,7 @@ const AlertDispatchModal = () => {
     const openModal = () => {
       loadAlerts();
       setDispatchStep(1);
+      setActiveIncidentTab("all");
       setSelectedAlert(null);
       setSelectedResponderIds(new Set());
       setShowModal(true);
@@ -286,7 +288,7 @@ const AlertDispatchModal = () => {
           orderBy("timestamp", "desc")
         )
       ),
-      getDocs(collection(db, "backupRequests")),
+      getDocs(collection(db, "backup_requests")),
     ]);
 
     const pendingAlerts = alertSnap.docs.map((d) =>
@@ -294,7 +296,7 @@ const AlertDispatchModal = () => {
     );
 
     const pendingBackupRequests = backupSnap.docs
-      .map((d) => normalizeIncident(d.id, d.data(), "backupRequests"))
+      .map((d) => normalizeIncident(d.id, d.data(), "backup_requests"))
       .filter((item) => isOpenBackupRequest(item as Record<string, unknown>));
 
     const nextAlerts = [...pendingBackupRequests, ...pendingAlerts].sort(
@@ -623,6 +625,18 @@ const sortedGroupedList = [...groupedList].sort((a: any, b: any) => {
   return String(a.team).localeCompare(String(b.team));
 });
 
+  const incidentCounts = {
+    all: alerts.length,
+    alerts: alerts.filter((item) => !item.__isBackupRequest).length,
+    backup: alerts.filter((item) => item.__isBackupRequest).length,
+  };
+
+  const visibleIncidents = alerts.filter((item) => {
+    if (activeIncidentTab === "alerts") return !item.__isBackupRequest;
+    if (activeIncidentTab === "backup") return item.__isBackupRequest;
+    return true;
+  });
+
 const getTeamStationName = (teamName: string) => {
   const team = teams.find((t) => t.teamName === teamName);
   if (!team) return "Unassigned";
@@ -734,11 +748,18 @@ const getTeamStationName = (teamName: string) => {
       );
 
       // Update alert → Dispatched
-      batch.update(doc(db, selectedAlert.__source || "alerts", selectedAlert.id), {
+      batch.update(
+        doc(
+          db,
+          selectedAlert.__source === "backup_requests" ? "backup_requests" : "alerts",
+          selectedAlert.id
+        ),
+        {
         status: "Dispatched",
         dispatchStatus: "Dispatched",
         respondedAt: serverTimestamp(),
-      });
+        }
+      );
 
       // ------------------------------------------------------------
       // 🚒 UPDATE TEAM + VEHICLE STATUS ON DISPATCH
@@ -826,7 +847,31 @@ const getTeamStationName = (teamName: string) => {
           <>
             <h3 className={styles.modalTitle}>Select Alert</h3>
 
-            {alerts.length === 0 && (
+            <div className={styles.modalTabs}>
+              <button
+                className={`${styles.modalTabBtn} ${activeIncidentTab === "all" ? styles.modalTabBtnActive : ""}`}
+                onClick={() => setActiveIncidentTab("all")}
+                type="button"
+              >
+                All ({incidentCounts.all})
+              </button>
+              <button
+                className={`${styles.modalTabBtn} ${activeIncidentTab === "alerts" ? styles.modalTabBtnActive : ""}`}
+                onClick={() => setActiveIncidentTab("alerts")}
+                type="button"
+              >
+                Alerts ({incidentCounts.alerts})
+              </button>
+              <button
+                className={`${styles.modalTabBtn} ${activeIncidentTab === "backup" ? styles.modalTabBtnActive : ""}`}
+                onClick={() => setActiveIncidentTab("backup")}
+                type="button"
+              >
+                Backup Requests ({incidentCounts.backup})
+              </button>
+            </div>
+
+            {visibleIncidents.length === 0 && (
               <p className={styles.distanceInfo}>No pending alerts or backup requests found.</p>
             )}
 
@@ -843,7 +888,7 @@ const getTeamStationName = (teamName: string) => {
                 </thead>
 
                 <tbody>
-                  {alerts.map((a) => (
+                  {visibleIncidents.map((a) => (
                     <tr key={a.id}>
                       <td>{a.__isBackupRequest ? "Backup Request" : a.type}</td>
                       <td>{a.userName}</td>

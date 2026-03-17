@@ -30,6 +30,37 @@
   color: #4b5563;
 }
 
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.filterBtn {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filterBtn:hover {
+  border-color: #8b0000;
+  color: #8b0000;
+  background: #fff5f5;
+}
+
+.filterBtnActive {
+  background: #8b0000;
+  border-color: #8b0000;
+  color: #ffffff;
+}
+
 .tableWrap {
   overflow-x: auto;
 }

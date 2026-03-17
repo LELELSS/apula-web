@@ -67,6 +67,51 @@
   border-color: #a30000;
 }
 
+.bulkActionsRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.bulkActionBtn {
+  border: 1px solid #a30000;
+  background: #a30000;
+  color: #ffffff;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.bulkActionBtn:hover {
+  background: #7f0000;
+  border-color: #7f0000;
+  transform: translateY(-1px);
+}
+
+.bulkActionBtnSecondary {
+  background: #ffffff;
+  color: #a30000;
+}
+
+.bulkActionBtnSecondary:hover {
+  background: #fff1f2;
+  border-color: #a30000;
+}
+
+.bulkActionBtn:disabled {
+  background: #e5e7eb;
+  color: #6b7280;
+  border-color: #d1d5db;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* ---------- NOTIFICATION LIST ---------- */
 .notificationList {
   display: flex;
@@ -516,6 +561,10 @@
     margin-left: 0;
     justify-content: flex-start;
   }
+
+  .bulkActionsRow {
+    justify-content: flex-start;
+  }
 }
 
 /* ---------- MOBILE ---------- */
@@ -539,6 +588,18 @@
     margin-left: 0;
     justify-content: flex-start;
     gap: 8px;
+  }
+
+  .bulkActionsRow {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .bulkActionBtn {
+    width: 100%;
+    font-size: 12px;
+    padding: 9px 12px;
   }
 
   .filterBtn {

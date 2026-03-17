@@ -26,9 +26,10 @@ export default function AdminActivityPage() {
   const [role, setRole] = useState("");
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [actionFilter, setActionFilter] = useState("all");
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    const unsub = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         setRole("");
         setLoading(false);
@@ -50,7 +51,7 @@ export default function AdminActivityPage() {
           query(collection(db, "admin_activity_logs"), orderBy("createdAt", "desc"))
         );
 
-        setLogs(logsSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ActivityLog)));
+        setLogs(logsSnap.docs.map((docSnap: any) => ({ id: docSnap.id, ...docSnap.data() } as ActivityLog)));
       } catch (error) {
         console.error("Error loading activity logs:", error);
       } finally {
@@ -65,6 +66,109 @@ export default function AdminActivityPage() {
     if (!ts?.seconds) return "N/A";
     return new Date(ts.seconds * 1000).toLocaleString();
   };
+
+  const getActionCategory = (action?: string) => {
+    const value = String(action || "").toLowerCase();
+
+    if (value.includes("page_visit")) return "page";
+    if (value.includes("dispatch")) return "dispatch";
+
+    if (
+      value.includes("user") ||
+      value.includes("account") ||
+      value.includes("approve") ||
+      value.includes("decline") ||
+      value.includes("role") ||
+      value.includes("status") ||
+      value.includes("request")
+    ) {
+      return "userActions";
+    }
+
+    return "other";
+  };
+
+  const formatPath = (path?: string) => {
+    const value = String(path || "").trim();
+    if (!value || value === "N/A") return "General";
+
+    const map: Record<string, string> = {
+      "/dashboard": "Dashboard",
+      "/dashboard/notifications": "Notifications",
+      "/dashboard/users": "Users",
+      "/dashboard/dispatch": "Dispatch",
+      "/dashboard/ResponderRequest": "Account Requests",
+      "/dashboard/admin-activity": "Admin Activity",
+      "/dashboard/reports": "Reports",
+      "/dashboard/stations": "Stations",
+      "/dashboard/settings": "Settings",
+    };
+
+    if (map[value]) return map[value];
+
+    const cleaned = value
+      .replace(/^\/dashboard\/?/i, "")
+      .replace(/[\-_]/g, " ")
+      .trim();
+
+    if (!cleaned) return "Dashboard";
+    return cleaned.replace(/\b\w/g, (m) => m.toUpperCase());
+  };
+
+  const formatAction = (action?: string) => {
+    const value = String(action || "").trim();
+    if (!value) return "Activity Recorded";
+
+    const map: Record<string, string> = {
+      page_visit: "Opened a Page",
+      edit_user_account: "Updated a User Account",
+      dispatch_event_monitored: "Dispatched Responders",
+      dispatch_blocked_already_monitored: "Dispatch Attempt Blocked",
+      approve_account_request: "Approved an Account Request",
+      decline_account_request: "Declined an Account Request",
+      create_account_request: "Submitted an Account Request",
+    };
+
+    if (map[value]) return map[value];
+    return value.replace(/[\-_]/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+  };
+
+  const formatTarget = (targetType?: string, targetId?: string) => {
+    const base = String(targetType || "").trim().toLowerCase();
+    if (!base) return "General System";
+
+    if (base === "route") return "Page";
+    if (base === "alert") return "Incident Alert";
+    if (base === "responder") return "Responder Account";
+    if (base === "admin") return "Admin Account";
+    if (base === "user") return "User Account";
+
+    return base.replace(/[\-_]/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+  };
+
+  const formatDetails = (details?: string, path?: string, action?: string) => {
+    const actionValue = String(action || "").toLowerCase();
+
+    if (actionValue === "page_visit") {
+      return `Visited ${formatPath(path)}`;
+    }
+
+    const value = String(details || "").trim();
+    if (!value) return "No additional details.";
+
+    return value
+      .replace(/^visited\s+/i, "Visited ")
+      .replace(/\/dashboard\/ResponderRequest/gi, "Account Requests")
+      .replace(/\/dashboard\/notifications/gi, "Notifications")
+      .replace(/\/dashboard\/users/gi, "Users")
+      .replace(/\/dashboard\/dispatch/gi, "Dispatch")
+      .replace(/\/dashboard/gi, "Dashboard");
+  };
+
+  const filteredLogs = logs.filter((log: ActivityLog) => {
+    if (actionFilter === "all") return true;
+    return getActionCategory(log.action) === actionFilter;
+  });
 
   return (
     <div className={styles.pageWrap}>
@@ -88,33 +192,59 @@ export default function AdminActivityPage() {
           ) : logs.length === 0 ? (
             <p className={styles.note}>No activity logs found.</p>
           ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Actor</th>
-                    <th>Role</th>
-                    <th>Action</th>
-                    <th>Target</th>
-                    <th>Details</th>
-                    <th>Path</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((log) => (
-                    <tr key={log.id}>
-                      <td>{formatTime(log.createdAt)}</td>
-                      <td>{log.actorName || log.actorEmail || "N/A"}</td>
-                      <td>{log.actorRole || "N/A"}</td>
-                      <td>{log.action || "N/A"}</td>
-                      <td>{log.targetType || "N/A"} {log.targetId ? `(${log.targetId})` : ""}</td>
-                      <td>{log.details || "N/A"}</td>
-                      <td>{log.path || "N/A"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div>
+              <div className={styles.filterRow}>
+                {[
+                  { key: "all", label: "All Actions" },
+                  { key: "userActions", label: "User Actions" },
+                  { key: "dispatch", label: "Dispatch" },
+                  { key: "page", label: "Page Visits" },
+                  { key: "other", label: "Other" },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    className={`${styles.filterBtn} ${
+                      actionFilter === item.key ? styles.filterBtnActive : ""
+                    }`}
+                    onClick={() => setActionFilter(item.key)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              {filteredLogs.length === 0 ? (
+                <p className={styles.note}>No logs match this filter.</p>
+              ) : (
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>Time</th>
+                        <th>Actor</th>
+                        <th>Role</th>
+                        <th>Action</th>
+                        <th>Target</th>
+                        <th>Details</th>
+                        <th>Path</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredLogs.map((log: ActivityLog) => (
+                        <tr key={log.id}>
+                          <td>{formatTime(log.createdAt)}</td>
+                          <td>{log.actorName || log.actorEmail || "N/A"}</td>
+                          <td>{log.actorRole || "N/A"}</td>
+                          <td>{formatAction(log.action)}</td>
+                          <td>{formatTarget(log.targetType, log.targetId)}</td>
+                          <td>{formatDetails(log.details, log.path, log.action)}</td>
+                          <td>{formatPath(log.path)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>

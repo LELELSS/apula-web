@@ -128,6 +128,7 @@ const NotificationPage: React.FC = () => {
   const [selectedNotif, setSelectedNotif] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [filter, setFilter] = useState("all");
+  const [bulkActionTarget, setBulkActionTarget] = useState<"all" | "filtered" | null>(null);
 
   /* 🔊 SOUND STATES */
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
@@ -250,10 +251,42 @@ const NotificationPage: React.FC = () => {
   /* FILTER LOGIC */
   const filteredNotifications = notifications.filter((n) => {
     const isRead = currentUid ? isReadByUser(n, currentUid) : false;
+
     if (filter === "read") return isRead;
     if (filter === "unread") return !isRead;
+
     return true;
   });
+
+  const unreadAllNotifications = currentUid
+    ? notifications.filter((n) => !isReadByUser(n, currentUid))
+    : [];
+
+  const unreadFilteredNotifications = currentUid
+    ? filteredNotifications.filter((n) => !isReadByUser(n, currentUid))
+    : [];
+
+  const markNotificationsAsRead = async (
+    items: any[],
+    target: "all" | "filtered"
+  ) => {
+    if (!currentUid || items.length === 0) return;
+
+    setBulkActionTarget(target);
+    try {
+      await Promise.all(
+        items.map((notif) =>
+          updateDoc(doc(db, notif.__source || "alerts", notif.id), {
+            readBy: arrayUnion(currentUid),
+          })
+        )
+      );
+    } catch (error) {
+      console.error("Failed to mark notifications as read:", error);
+    } finally {
+      setBulkActionTarget(null);
+    }
+  };
 
   /* PAGINATION LOGIC */
   const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage);
@@ -296,6 +329,38 @@ const NotificationPage: React.FC = () => {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className={styles.bulkActionsRow}>
+            <button
+              className={styles.bulkActionBtn}
+              onClick={() =>
+                markNotificationsAsRead(unreadFilteredNotifications, "filtered")
+              }
+              disabled={
+                !currentUid ||
+                unreadFilteredNotifications.length === 0 ||
+                bulkActionTarget !== null
+              }
+            >
+              {bulkActionTarget === "filtered"
+                ? "Marking visible..."
+                : `Mark Filtered as Read (${unreadFilteredNotifications.length})`}
+            </button>
+
+            <button
+              className={`${styles.bulkActionBtn} ${styles.bulkActionBtnSecondary}`}
+              onClick={() => markNotificationsAsRead(unreadAllNotifications, "all")}
+              disabled={
+                !currentUid ||
+                unreadAllNotifications.length === 0 ||
+                bulkActionTarget !== null
+              }
+            >
+              {bulkActionTarget === "all"
+                ? "Marking all..."
+                : `Mark All as Read (${unreadAllNotifications.length})`}
+            </button>
           </div>
 
           <hr className={styles.separator} />

@@ -36,6 +36,7 @@ const isOpenBackupRequest = (data: Record<string, unknown>) => {
     status === "closed" ||
     status === "completed" ||
     status === "done" ||
+    status === "approved" ||
     status === "declined" ||
     status === "cancelled" ||
     status === "canceled"

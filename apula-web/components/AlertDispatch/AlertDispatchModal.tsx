@@ -31,6 +31,7 @@ const isOpenBackupRequest = (data: Record<string, unknown>) => {
     status === "closed" ||
     status === "completed" ||
     status === "done" ||
+    status === "approved" ||
     status === "dispatched" ||
     status === "accepted" ||
     status === "declined" ||
@@ -80,6 +81,7 @@ const normalizeIncident = (id: string, data: any, source: "alerts" | "backup_req
 
   const userName =
     data?.userName ||
+    data?.requestedByName ||
     data?.reportedBy ||
     data?.requestedBy ||
     data?.requesterName ||
@@ -88,6 +90,7 @@ const normalizeIncident = (id: string, data: any, source: "alerts" | "backup_req
 
   const userContact =
     data?.userContact ||
+    data?.requestedByEmail ||
     data?.contact ||
     data?.phone ||
     data?.mobile ||
@@ -117,6 +120,7 @@ const normalizeIncident = (id: string, data: any, source: "alerts" | "backup_req
     ...data,
     __source: source,
     __isBackupRequest: source === "backup_requests",
+    __baseAlertId: source === "backup_requests" ? String(data?.alertId || "") : id,
     type,
     userName,
     userContact,
@@ -155,6 +159,7 @@ const AlertDispatchModal = () => {
 
   const [teamDistancesKm, setTeamDistancesKm] = useState<Record<string, number | null>>({});
   const [recommendedTeamName, setRecommendedTeamName] = useState<string | null>(null);
+  const [alreadyDispatchedTeams, setAlreadyDispatchedTeams] = useState<Set<string>>(new Set());
   const [isCalculatingDistances, setIsCalculatingDistances] = useState(false);
   const stationCoordCacheRef = useRef<Record<string, { lat: number; lng: number } | null>>({});
 
@@ -291,12 +296,99 @@ const AlertDispatchModal = () => {
       getDocs(collection(db, "backup_requests")),
     ]);
 
+    const alertMap = new Map<string, any>();
+    alertSnap.docs.forEach((docSnap) => {
+      alertMap.set(docSnap.id, docSnap.data());
+    });
+
+    const dispatchIds = new Set<string>();
+    backupSnap.docs.forEach((docSnap) => {
+      const data = docSnap.data() as any;
+      if (typeof data?.sourceDispatchId === "string" && data.sourceDispatchId.trim()) {
+        dispatchIds.add(data.sourceDispatchId.trim());
+      }
+      if (typeof data?.approvedDispatchId === "string" && data.approvedDispatchId.trim()) {
+        dispatchIds.add(data.approvedDispatchId.trim());
+      }
+    });
+
+    const dispatchDocs = await Promise.all(
+      Array.from(dispatchIds).map(async (dispatchId) => {
+        const docSnap = await getDoc(doc(db, "dispatches", dispatchId));
+        return docSnap.exists() ? [dispatchId, docSnap.data()] : null;
+      })
+    );
+
+    const dispatchMap = new Map<string, any>();
+    dispatchDocs.forEach((entry) => {
+      if (entry) {
+        dispatchMap.set(entry[0], entry[1]);
+      }
+    });
+
     const pendingAlerts = alertSnap.docs.map((d) =>
       normalizeIncident(d.id, d.data(), "alerts")
     );
 
     const pendingBackupRequests = backupSnap.docs
-      .map((d) => normalizeIncident(d.id, d.data(), "backup_requests"))
+      .map((d) => {
+        const backupData = d.data() as any;
+        const linkedAlert = backupData?.alertId ? alertMap.get(String(backupData.alertId)) || {} : {};
+        const linkedDispatch =
+          dispatchMap.get(String(backupData?.sourceDispatchId || "")) ||
+          dispatchMap.get(String(backupData?.approvedDispatchId || "")) ||
+          {};
+
+        return normalizeIncident(
+          d.id,
+          {
+            ...linkedDispatch,
+            ...linkedAlert,
+            ...backupData,
+            userName: backupData?.requestedByName || linkedAlert?.userName || linkedDispatch?.userReported,
+            userContact:
+              backupData?.requestedByEmail ||
+              linkedAlert?.userContact ||
+              linkedDispatch?.userContact ||
+              linkedAlert?.userEmail ||
+              linkedDispatch?.userEmail ||
+              "",
+            userEmail:
+              backupData?.requestedByEmail ||
+              linkedAlert?.userEmail ||
+              linkedDispatch?.userEmail ||
+              "",
+            userAddress:
+              linkedAlert?.userAddress ||
+              linkedDispatch?.userAddress ||
+              linkedAlert?.location ||
+              linkedDispatch?.alertLocation ||
+              backupData?.stationName ||
+              backupData?.address ||
+              "",
+            location:
+              linkedAlert?.location ||
+              linkedDispatch?.alertLocation ||
+              linkedAlert?.userAddress ||
+              linkedDispatch?.userAddress ||
+              backupData?.stationName ||
+              "",
+            latitude:
+              linkedAlert?.latitude ??
+              linkedAlert?.lat ??
+              linkedDispatch?.latitude ??
+              linkedDispatch?.lat,
+            longitude:
+              linkedAlert?.longitude ??
+              linkedAlert?.lng ??
+              linkedAlert?.lon ??
+              linkedDispatch?.longitude ??
+              linkedDispatch?.lng ??
+              linkedDispatch?.lon,
+          },
+          "backup_requests"
+        );
+      })
       .filter((item) => isOpenBackupRequest(item as Record<string, unknown>));
 
     const nextAlerts = [...pendingBackupRequests, ...pendingAlerts].sort(
@@ -468,6 +560,44 @@ const AlertDispatchModal = () => {
     stationCoordCacheRef.current[cacheKey] = geocoded;
     return geocoded;
   };
+
+  useEffect(() => {
+    const loadAlreadyDispatchedTeams = async () => {
+      if (dispatchStep !== 2 || !selectedAlert) {
+        setAlreadyDispatchedTeams(new Set());
+        return;
+      }
+
+      const baseAlertId = String(selectedAlert.__baseAlertId || selectedAlert.alertId || selectedAlert.id || "").trim();
+      if (!baseAlertId) {
+        setAlreadyDispatchedTeams(new Set());
+        return;
+      }
+
+      const snap = await getDocs(
+        query(collection(db, "dispatches"), where("alertId", "==", baseAlertId))
+      );
+
+      const dispatchedTeams = new Set<string>();
+      snap.docs.forEach((docSnap) => {
+        const data = docSnap.data() as any;
+        if (data?.status !== "Dispatched") {
+          return;
+        }
+
+        (data.responders || []).forEach((responder: any) => {
+          const teamName = responder?.team || responder?.teamName;
+          if (teamName) {
+            dispatchedTeams.add(String(teamName));
+          }
+        });
+      });
+
+      setAlreadyDispatchedTeams(dispatchedTeams);
+    };
+
+    loadAlreadyDispatchedTeams();
+  }, [dispatchStep, selectedAlert]);
 
   useEffect(() => {
     const computeDistances = async () => {
@@ -704,7 +834,8 @@ const getTeamStationName = (teamName: string) => {
       const dispatchedByName = await getDispatcherName();
 
       batch.set(ref, {
-        alertId: selectedAlert.id,
+        alertId: selectedAlert.__baseAlertId || selectedAlert.alertId || selectedAlert.id,
+        backupRequestId: selectedAlert.__isBackupRequest ? selectedAlert.id : "",
         alertType: selectedAlert.type,
         alertLocation: selectedAlert.location,
         snapshotUrl: selectedAlert.snapshotUrl || null,
@@ -957,6 +1088,9 @@ const getTeamStationName = (teamName: string) => {
                       {g.team}
                       {recommendedTeamName === g.team && (
                         <span className={styles.recommendedBadge}>Recommended</span>
+                      )}
+                      {alreadyDispatchedTeams.has(g.team) && (
+                        <span className={styles.alreadyDispatchedBadge}>Already Dispatched</span>
                       )}
                     </td>
                     <td>{getTeamStationName(g.team)}</td>

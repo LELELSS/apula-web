@@ -173,7 +173,7 @@ const ResponderRequestsPage = () => {
       <div className={styles.container}>
         <div className={styles.contentSection}>
           <div className={styles.headerRow}>
-            <h2 className={styles.pageTitle}>Account Requests</h2>
+            <h2 className={styles.pageTitle}>Account Permission Requests</h2>
           </div>
 
           <hr className={styles.separator} />
@@ -239,7 +239,7 @@ const ResponderRequestsPage = () => {
                 ) : (
                   <tr>
                     <td colSpan={6} className={styles.noResults}>
-                      No pending account requests.
+                      No pending account permission requests.
                     </td>
                   </tr>
                 )}

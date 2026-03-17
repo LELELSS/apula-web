@@ -244,6 +244,7 @@ export default function UsersPage() {
                   <th>ID</th>
                   <th>Name</th>
                   <th>Role</th>
+                  <th>Status</th>
                   <th>Contact</th>
                   <th>Actions</th>
                 </tr>
@@ -262,6 +263,7 @@ export default function UsersPage() {
                       <td data-label="ID">{user.id}</td>
                       <td data-label="Name">{user.name ?? "N/A"}</td>
                       <td data-label="Role">{user.role ?? "N/A"}</td>
+                      <td data-label="Status">{user.status ?? "N/A"}</td>
                       <td data-label="Contact">{user.contact ?? "N/A"}</td>
                       <td data-label="Actions" className={styles.actionCell}>
                         <button
@@ -380,8 +382,18 @@ export default function UsersPage() {
                 }
                 className={styles.inputField}
               >
-                <option value="Available">Available</option>
-                <option value="Unavailable">Unavailable</option>
+                {norm(editTarget.role) === "responder" ? (
+                  <>
+                    <option value="Available">Available</option>
+                    <option value="Unavailable">Unavailable</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="Approved">Approved</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Declined">Declined</option>
+                  </>
+                )}
               </select>
 
               <p><strong>Email:</strong> {editTarget.email ?? "N/A"}</p>
@@ -404,7 +416,27 @@ export default function UsersPage() {
                   };
 
                   if (norm(currentRole) === "superadmin") {
+                    const nextRole = norm(editTarget.role);
                     payload.role = editTarget.role;
+
+                    if (nextRole === "admin" || nextRole === "superadmin") {
+                      const nextStatusRaw = norm(editTarget.status);
+                      const isAllowedAdminStatus =
+                        nextStatusRaw === "approved" ||
+                        nextStatusRaw === "pending" ||
+                        nextStatusRaw === "declined";
+
+                      const nextStatus = isAllowedAdminStatus
+                        ? nextStatusRaw.charAt(0).toUpperCase() + nextStatusRaw.slice(1)
+                        : "Approved";
+
+                      payload.status = nextStatus;
+                      payload.approved = nextStatus === "Approved";
+                    } else if (nextRole === "responder") {
+                      payload.approved = true;
+                      payload.status =
+                        norm(editTarget.status) === "unavailable" ? "Unavailable" : "Available";
+                    }
                   }
 
                   await updateDoc(doc(db, "users", editTarget.id), payload);
@@ -421,7 +453,11 @@ export default function UsersPage() {
                   setTimeout(() => setShowSuccess(false), 2000);
                 } catch (err) {
                   console.error("Error updating status:", err);
-                  alert("Failed to update status.");
+                  const message =
+                    typeof err === "object" && err && "message" in err
+                      ? String((err as { message?: string }).message)
+                      : "Failed to update status.";
+                  alert(message);
                 }
 
                 setEditTarget(null);

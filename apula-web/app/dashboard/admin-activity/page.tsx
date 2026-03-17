@@ -27,6 +27,8 @@ export default function AdminActivityPage() {
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [actionFilter, setActionFilter] = useState("all");
+  const [searchText, setSearchText] = useState("");
+  const [dateFilter, setDateFilter] = useState("all");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user: any) => {
@@ -166,8 +168,61 @@ export default function AdminActivityPage() {
   };
 
   const filteredLogs = logs.filter((log: ActivityLog) => {
-    if (actionFilter === "all") return true;
-    return getActionCategory(log.action) === actionFilter;
+    const createdMs = (log.createdAt?.seconds || 0) * 1000;
+    const now = new Date();
+
+    if (dateFilter !== "all") {
+      if (!createdMs) return false;
+
+      const createdDate = new Date(createdMs);
+
+      if (dateFilter === "today") {
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        if (createdMs < startOfDay) return false;
+      }
+
+      if (dateFilter === "last7") {
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        if (createdMs < sevenDaysAgo.getTime()) return false;
+      }
+
+      if (dateFilter === "month") {
+        if (
+          createdDate.getMonth() !== now.getMonth() ||
+          createdDate.getFullYear() !== now.getFullYear()
+        ) {
+          return false;
+        }
+      }
+    }
+
+    if (actionFilter !== "all" && getActionCategory(log.action) !== actionFilter) {
+      return false;
+    }
+
+    const query = searchText.trim().toLowerCase();
+    if (!query) return true;
+
+    const searchBlob = [
+      formatTime(log.createdAt),
+      log.actorName || "",
+      log.actorEmail || "",
+      log.actorRole || "",
+      formatAction(log.action),
+      log.action || "",
+      formatTarget(log.targetType, log.targetId),
+      log.targetType || "",
+      log.targetId || "",
+      formatDetails(log.details, log.path, log.action),
+      log.details || "",
+      formatPath(log.path),
+      log.path || "",
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return searchBlob.includes(query);
   });
 
   return (
@@ -193,6 +248,44 @@ export default function AdminActivityPage() {
             <p className={styles.note}>No activity logs found.</p>
           ) : (
             <div>
+              <div className={styles.searchRow}>
+                <input
+                  type="text"
+                  value={searchText}
+                  onChange={(e: any) => setSearchText(e.target.value)}
+                  placeholder="Search by name, event, date, details, or page"
+                  className={styles.searchInput}
+                />
+                {searchText.trim() && (
+                  <button
+                    type="button"
+                    className={styles.clearBtn}
+                    onClick={() => setSearchText("")}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              <div className={styles.dateFilterRow}>
+                {[
+                  { key: "all", label: "All Dates" },
+                  { key: "today", label: "Today" },
+                  { key: "last7", label: "Last 7 Days" },
+                  { key: "month", label: "This Month" },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    className={`${styles.dateFilterBtn} ${
+                      dateFilter === item.key ? styles.dateFilterBtnActive : ""
+                    }`}
+                    onClick={() => setDateFilter(item.key)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
               <div className={styles.filterRow}>
                 {[
                   { key: "all", label: "All Actions" },
@@ -214,7 +307,7 @@ export default function AdminActivityPage() {
               </div>
 
               {filteredLogs.length === 0 ? (
-                <p className={styles.note}>No logs match this filter.</p>
+                <p className={styles.note}>No logs match your filter or search.</p>
               ) : (
                 <div className={styles.tableWrap}>
                   <table className={styles.table}>

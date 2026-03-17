@@ -30,6 +30,79 @@
   color: #4b5563;
 }
 
+.searchRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 240px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #111827;
+  background: #ffffff;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: #8b0000;
+  box-shadow: 0 0 0 2px rgba(139, 0, 0, 0.15);
+}
+
+.clearBtn {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.clearBtn:hover {
+  border-color: #8b0000;
+  color: #8b0000;
+  background: #fff5f5;
+}
+
+.dateFilterRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.dateFilterBtn {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dateFilterBtn:hover {
+  border-color: #8b0000;
+  color: #8b0000;
+  background: #fff5f5;
+}
+
+.dateFilterBtnActive {
+  background: #111827;
+  border-color: #111827;
+  color: #ffffff;
+}
+
 .filterRow {
   display: flex;
   flex-wrap: wrap;

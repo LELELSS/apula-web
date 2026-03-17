@@ -131,9 +131,11 @@ export default function Signup() {
         role: "admin", // default role
         createdAt: new Date(),
         verified: true,
+        approved: false,
+        status: "Pending",
       });
 
-      toast.success("Account created successfully!", {
+      toast.success("Account created. Waiting for super admin approval.", {
         position: "top-center",
         autoClose: 3000,
         theme: "light",

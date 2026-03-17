@@ -59,6 +59,7 @@ const normalizeIncident = (id: string, data: any, source: "alerts" | "backup_req
   ...data,
   __source: source,
   __isBackupRequest: source === "backup_requests",
+  __baseAlertId: source === "backup_requests" ? String(data?.alertId || "") : id,
   type:
     data?.type ||
     data?.alertType ||
@@ -354,7 +355,8 @@ const latest = snap.docs
       const dispatchRef = doc(collection(db, "dispatches"));
 
       batch.set(dispatchRef, {
-        alertId: selectedAlert.id,
+        alertId: selectedAlert.__baseAlertId || selectedAlert.alertId || selectedAlert.id,
+        backupRequestId: selectedAlert.__isBackupRequest ? selectedAlert.id : "",
         alertType: selectedAlert.type,
         alertLocation: selectedAlert.location,
         snapshotUrl: selectedAlert.snapshotUrl || null,
@@ -385,7 +387,11 @@ const latest = snap.docs
 
       // update alert doc -> Dispatched
       batch.update(
-        doc(db, selectedAlert.__source || "alerts", selectedAlert.id),
+        doc(
+          db,
+          selectedAlert.__source === "backup_requests" ? "backup_requests" : "alerts",
+          selectedAlert.id
+        ),
         { status: "Dispatched", dispatchStatus: "Dispatched" }
       );
 

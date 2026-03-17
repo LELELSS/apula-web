@@ -27,8 +27,6 @@ import {
   doc,
   getDoc,
   collection,
-  query,
-  where,
   onSnapshot,
 } from "firebase/firestore";
 
@@ -79,11 +77,33 @@ export default function AdminHeader() {
 
   // 🔥 Realtime unread count (GLOBAL)
   useEffect(() => {
-    const q = query(collection(db, "alerts"), where("read", "==", false));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setUnreadCount(snapshot.size);
+    let alertUnread = 0;
+    let backupUnread = 0;
+
+    const syncUnread = () => {
+      setUnreadCount(alertUnread + backupUnread);
+    };
+
+    const unsubscribeAlerts = onSnapshot(collection(db, "alerts"), (snapshot) => {
+      alertUnread = snapshot.docs.reduce((count, docSnap) => {
+        const data = docSnap.data() as Record<string, unknown>;
+        return data.read === true ? count : count + 1;
+      }, 0);
+      syncUnread();
     });
-    return () => unsubscribe();
+
+    const unsubscribeBackup = onSnapshot(collection(db, "backup_requests"), (snapshot) => {
+      backupUnread = snapshot.docs.reduce((count, docSnap) => {
+        const data = docSnap.data() as Record<string, unknown>;
+        return data.read === true ? count : count + 1;
+      }, 0);
+      syncUnread();
+    });
+
+    return () => {
+      unsubscribeAlerts();
+      unsubscribeBackup();
+    };
   }, []);
 
   // 🔊 Play or stop sound based on unreadCount (GLOBAL)

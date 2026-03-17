@@ -105,6 +105,53 @@
   margin-top: 10px;
 }
 
+.errorModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 16px;
+}
+
+.errorModal {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.errorModalTitle {
+  margin: 0 0 10px;
+  color: #8b0000;
+  font-size: 1.2rem;
+}
+
+.errorModalText {
+  margin: 0;
+  color: #333;
+  line-height: 1.5;
+}
+
+.errorModalBtn {
+  margin-top: 16px;
+  border: none;
+  border-radius: 8px;
+  background: #8b0000;
+  color: #fff;
+  font-weight: 600;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.errorModalBtn:hover {
+  background: #690000;
+}
+
 .signupText {
   margin-top: 18px;
   font-size: 0.95rem;

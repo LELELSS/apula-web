@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import AdminHeader from "@/components/shared/adminHeader";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 
 import {
   collection,
@@ -12,6 +12,7 @@ import {
   updateDoc,
   doc,
 } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 
 import { FaUserCheck, FaUserTimes, FaSearch } from "react-icons/fa";
 import styles from "./responderRequest.module.css";
@@ -27,6 +28,7 @@ type Responder = {
   role?: string;
   verified?: boolean;
   approved?: boolean;
+  uid?: string;
 };
 
 type ConfirmAction =
@@ -42,23 +44,51 @@ const ResponderRequestsPage = () => {
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [currentRole, setCurrentRole] = useState<string>("");
+  const [checkingRole, setCheckingRole] = useState(true);
 
   useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setCurrentRole("");
+        setCheckingRole(false);
+        return;
+      }
+
+      try {
+        const userSnap = await getDocs(query(collection(db, "users"), where("email", "==", user.email)));
+        const first = userSnap.docs[0];
+        const role = (first?.data()?.role || "") as string;
+        setCurrentRole(role);
+      } catch (error) {
+        console.error("Error checking role:", error);
+        setCurrentRole("");
+      } finally {
+        setCheckingRole(false);
+      }
+    });
+
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (checkingRole || currentRole !== "superadmin") {
+      return;
+    }
+
     const loadResponders = async () => {
       try {
-        const q = query(
-          collection(db, "users"),
-          where("role", "==", "responder"),
-          where("verified", "==", true),
-          where("approved", "==", false)
-        );
-
-        const querySnapshot = await getDocs(q);
-        const list: Responder[] = [];
-
-        querySnapshot.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() } as Responder);
-        });
+        const querySnapshot = await getDocs(collection(db, "users"));
+        const list: Responder[] = querySnapshot.docs
+          .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Responder))
+          .filter((item) => {
+            const role = String(item.role || "").toLowerCase();
+            const isRequestRole = role === "responder" || role === "admin";
+            const verified = item.verified === true;
+            const pendingApproval = item.approved === false;
+            const notDeclined = String(item.status || "").toLowerCase() !== "declined";
+            return isRequestRole && verified && pendingApproval && notDeclined;
+          });
 
         setResponders(list);
       } catch (error) {
@@ -67,7 +97,7 @@ const ResponderRequestsPage = () => {
     };
 
     loadResponders();
-  }, []);
+  }, [checkingRole, currentRole]);
 
   const filtered = responders.filter((r) =>
     `${r.name ?? ""} ${r.email ?? ""}`
@@ -90,7 +120,7 @@ const ResponderRequestsPage = () => {
       if (action === "accept") {
         await updateDoc(ref, {
           approved: true,
-          status: "Available",
+          status: responder.role === "responder" ? "Available" : "Approved",
         });
       } else {
         await updateDoc(ref, {
@@ -123,10 +153,27 @@ const ResponderRequestsPage = () => {
 
       <AlertDispatchModal />
 
+      {checkingRole ? (
+        <div className={styles.container}>
+          <div className={styles.contentSection}>
+            <h2 className={styles.pageTitle}>Checking access...</h2>
+          </div>
+        </div>
+      ) : currentRole !== "superadmin" ? (
+        <div className={styles.container}>
+          <div className={styles.contentSection}>
+            <h2 className={styles.pageTitle}>Access Restricted</h2>
+            <p className={styles.noResults}>
+              Only super admin can approve or decline account requests.
+            </p>
+          </div>
+        </div>
+      ) : (
+
       <div className={styles.container}>
         <div className={styles.contentSection}>
           <div className={styles.headerRow}>
-            <h2 className={styles.pageTitle}>Responder Requests</h2>
+            <h2 className={styles.pageTitle}>Account Requests</h2>
           </div>
 
           <hr className={styles.separator} />
@@ -150,6 +197,7 @@ const ResponderRequestsPage = () => {
                 <tr>
                   <th>Name</th>
                   <th>Email</th>
+                  <th>Role</th>
                   <th>Address</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -162,6 +210,7 @@ const ResponderRequestsPage = () => {
                     <tr key={r.id}>
                       <td data-label="Name">{r.name ?? "N/A"}</td>
                       <td data-label="Email">{r.email ?? "N/A"}</td>
+                      <td data-label="Role">{r.role ?? "N/A"}</td>
                       <td data-label="Address">{r.address ?? "N/A"}</td>
                       <td data-label="Status">{r.status ?? "Pending"}</td>
                       <td data-label="Actions" className={styles.actionCell}>
@@ -189,8 +238,8 @@ const ResponderRequestsPage = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className={styles.noResults}>
-                      No pending responders.
+                    <td colSpan={6} className={styles.noResults}>
+                      No pending account requests.
                     </td>
                   </tr>
                 )}
@@ -199,6 +248,7 @@ const ResponderRequestsPage = () => {
           </div>
         </div>
       </div>
+      )}
 
       {confirmAction && (
         <div className={styles.modalOverlay}>

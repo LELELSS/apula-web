@@ -13,7 +13,8 @@ import {
   FaSearch,
 } from "react-icons/fa";
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 type User = {
   id: string;
@@ -36,9 +37,31 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [currentRole, setCurrentRole] = useState<string>("");
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setCurrentRole("");
+        return;
+      }
+
+      try {
+        const snap = await getDocs(collection(db, "users"));
+        const current = snap.docs.find((item) => item.id === user.uid);
+        const role = String(current?.data()?.role || "");
+        setCurrentRole(role);
+      } catch (err) {
+        console.error("Error loading current role:", err);
+        setCurrentRole("");
+      }
+    });
+
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -103,6 +126,21 @@ export default function UsersPage() {
 
   const openModal = (user: User) => setSelectedUser(user);
   const closeModal = () => setSelectedUser(null);
+
+  const canEditUser = (user: User) => {
+    const targetRole = norm(user.role);
+    const actorRole = norm(currentRole);
+
+    if (actorRole === "superadmin") {
+      return true;
+    }
+
+    if (actorRole === "admin") {
+      return targetRole === "responder";
+    }
+
+    return false;
+  };
 
   const formatCreatedAt = (createdAt: any, created_time?: string) => {
     if (!createdAt && created_time) return created_time;
@@ -233,7 +271,7 @@ export default function UsersPage() {
                           <span>View</span>
                         </button>
 
-                        {norm(user.role) === "responder" && (
+                        {canEditUser(user) && (
                           <button
                             className={styles.editBtn}
                             onClick={() => setEditTarget(user)}
@@ -312,6 +350,23 @@ export default function UsersPage() {
         <div className={styles.modalOverlay} onClick={() => setEditTarget(null)}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <h3 className={styles.modalTitle}>Edit Responder Status</h3>
+            {norm(currentRole) === "superadmin" && (
+              <>
+                <label className={styles.inputLabel}><strong>Role:</strong></label>
+                <select
+                  value={editTarget.role ?? "user"}
+                  onChange={(e) =>
+                    setEditTarget((prev) => prev && { ...prev, role: e.target.value })
+                  }
+                  className={styles.inputField}
+                >
+                  <option value="superadmin">superadmin</option>
+                  <option value="admin">admin</option>
+                  <option value="responder">responder</option>
+                  <option value="user">user</option>
+                </select>
+              </>
+            )}
 
             <div className={styles.modalDetails}>
               <p><strong>Name:</strong> {editTarget.name ?? "N/A"}</p>
@@ -339,13 +394,26 @@ export default function UsersPage() {
                 if (!editTarget) return;
 
                 try {
-                  await updateDoc(doc(db, "users", editTarget.id), {
+                  if (!canEditUser(editTarget)) {
+                    alert("You are not allowed to edit this account.");
+                    return;
+                  }
+
+                  const payload: Record<string, unknown> = {
                     status: editTarget.status,
-                  });
+                  };
+
+                  if (norm(currentRole) === "superadmin") {
+                    payload.role = editTarget.role;
+                  }
+
+                  await updateDoc(doc(db, "users", editTarget.id), payload);
 
                   setUsers((prev) =>
                     prev.map((u) =>
-                      u.id === editTarget.id ? { ...u, status: editTarget.status } : u
+                      u.id === editTarget.id
+                        ? { ...u, status: editTarget.status, role: editTarget.role }
+                        : u
                     )
                   );
 

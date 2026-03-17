@@ -22,6 +22,7 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [showErrorModal, setShowErrorModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
@@ -38,6 +39,7 @@ export default function Login() {
 
     if (!username || !password) {
       setError("Please enter both email and password.");
+      setShowErrorModal(true);
       return;
     }
 
@@ -64,6 +66,16 @@ export default function Login() {
         throw new Error("Access denied. Authorized personnel only.");
       }
 
+      if (userData.status === "Declined") {
+        await signOut(auth);
+        throw new Error("Your account request was declined by the super admin.");
+      }
+
+      if (userData.role !== "superadmin" && userData.approved === false) {
+        await signOut(auth);
+        throw new Error("Your account is pending super admin approval.");
+      }
+
       setSessionCookie(createSessionPayload(user.uid, userData.role || "admin"));
 
 
@@ -79,6 +91,7 @@ export default function Login() {
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Invalid email or password.");
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
     }
@@ -147,8 +160,6 @@ export default function Login() {
                 </a>
               </div>
 
-              {error && <p className={styles.error}>{error}</p>}
-
               <button
                 type="submit"
                 className={styles.button}
@@ -167,6 +178,22 @@ export default function Login() {
           </div>
         </div>
       </div>
+
+      {showErrorModal && (
+        <div className={styles.errorModalOverlay} onClick={() => setShowErrorModal(false)}>
+          <div className={styles.errorModal} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.errorModalTitle}>Login Failed</h3>
+            <p className={styles.errorModalText}>{error || "Invalid email or password."}</p>
+            <button
+              type="button"
+              className={styles.errorModalBtn}
+              onClick={() => setShowErrorModal(false)}
+            >
+              Okay
+            </button>
+          </div>
+        </div>
+      )}
 
       <ToastContainer />
     </div>

@@ -355,55 +355,7 @@ const latest = snap.docs
 
       const responderEmails = respondersList.map((r) => (r.email || "").toLowerCase());
 
-      const existingDispatchesSnap = await getDocs(
-        query(collection(db, "dispatches"), where("alertId", "==", baseAlertId))
-      );
-
-      const alreadyMonitored = existingDispatchesSnap.docs.some(
-        (docSnap) => String((docSnap.data() as any)?.status || "") === "Dispatched"
-      );
-
-      if (alreadyMonitored) {
-        await addDoc(collection(db, "notifications"), {
-          type: "Monitoring Notice",
-          status: "Monitored",
-          message: "This fire event is already being monitored by another dispatch team.",
-          alertId: baseAlertId,
-          location: selectedAlert.location || selectedAlert.userAddress || "",
-          userName: selectedAlert.userName || "System",
-          userAddress: selectedAlert.userAddress || selectedAlert.location || "",
-          userContact: selectedAlert.userContact || "",
-          userEmail: selectedAlert.userEmail || "",
-          readBy: [],
-          timestamp: serverTimestamp(),
-          createdAt: serverTimestamp(),
-        });
-
-        try {
-          await updateDoc(doc(db, "alerts", baseAlertId), {
-            monitoringStatus: "Monitored",
-            monitoringMessage: "Duplicate dispatch attempt blocked because event is already monitored.",
-            monitoringUpdatedAt: serverTimestamp(),
-          });
-        } catch {}
-
-        if (currentUser) {
-          await logActivity({
-            actorUid: currentUser.uid,
-            actorEmail: currentUser.email || "",
-            actorName: dispatchedByName,
-            actorRole: "admin",
-            action: "dispatch_blocked_already_monitored",
-            targetId: String(baseAlertId),
-            targetType: "alert",
-            details: "Blocked duplicate dispatch because alert is already monitored.",
-            path: "/dashboard/dispatch",
-          });
-        }
-
-        alert("This fire event is already being monitored.");
-        return;
-      }
+      // Multiple team dispatches allowed for same incident
 
       // create dispatch document
       const dispatchRef = doc(collection(db, "dispatches"));

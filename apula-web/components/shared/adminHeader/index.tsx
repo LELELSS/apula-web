@@ -136,9 +136,13 @@ export default function AdminHeader() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        clearSessionCookie();
         setUserName("Guest");
         setInitial(getFirstNameInitial("Guest"));
         setCurrentUid("");
+        if (pathname.startsWith("/dashboard")) {
+          window.location.replace("/login?reason=auth-required");
+        }
         return;
       }
 
@@ -166,7 +170,7 @@ export default function AdminHeader() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     if (role !== "admin") {

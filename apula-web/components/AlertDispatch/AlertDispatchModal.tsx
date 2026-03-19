@@ -986,9 +986,35 @@ const getTeamStationName = (teamName: string) => {
     previewAlert?.alertLocation ||
     "";
 
-  const mapEmbedSrc = previewAddress
-    ? `https://maps.google.com/maps?q=${encodeURIComponent(previewAddress)}&z=15&output=embed`
-    : "";
+  const toNumber = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  };
+
+  const previewLat =
+    toNumber(previewAlert?.latitude) ??
+    toNumber(previewAlert?.lat);
+
+  const previewLng =
+    toNumber(previewAlert?.longitude) ??
+    toNumber(previewAlert?.lng) ??
+    toNumber(previewAlert?.lon);
+
+  const hasExactCoords =
+    previewLat !== null &&
+    previewLng !== null &&
+    Math.abs(previewLat) <= 90 &&
+    Math.abs(previewLng) <= 180;
+
+  const mapEmbedSrc = hasExactCoords
+    ? `https://maps.google.com/maps?q=loc:${previewLat},${previewLng}&z=17&output=embed`
+    : previewAddress
+      ? `https://maps.google.com/maps?q=${encodeURIComponent(previewAddress)}&z=15&output=embed`
+      : "";
 
   const fireType =
     previewAlert?.type ||

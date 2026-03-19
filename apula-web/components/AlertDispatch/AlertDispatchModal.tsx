@@ -1140,8 +1140,16 @@ const getTeamStationName = (teamName: string) => {
   const hasPreviewImage = Boolean(previewImageSrc);
 
   return (
-    <div className={styles.modalOverlay}>
-      <div className={styles.modalWide}>
+    <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
+      <div className={styles.modalWide} onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className={styles.modalCloseIcon}
+          aria-label="Close alert dispatch modal"
+          onClick={() => setShowModal(false)}
+        >
+          ×
+        </button>
         
         {/* STEP 1: ALERTS */}
         {dispatchStep === 1 && (
@@ -1374,6 +1382,14 @@ const getTeamStationName = (teamName: string) => {
           onClick={() => setShowAlertPreviewModal(false)}
         >
           <div className={styles.modalWide} onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className={styles.modalCloseIcon}
+              aria-label="Close alert preview"
+              onClick={() => setShowAlertPreviewModal(false)}
+            >
+              ×
+            </button>
             <h3 className={styles.modalTitle}>Alert Snapshot</h3>
 
             <div className={styles.alertVisualGrid}>
@@ -1449,6 +1465,14 @@ const getTeamStationName = (teamName: string) => {
       {showViewModal && selectedDispatch && (
   <div className={styles.modalOverlay} onClick={() => setShowViewModal(false)}>
     <div className={styles.modalWide} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className={styles.modalCloseIcon}
+        aria-label="Close dispatch details"
+        onClick={() => setShowViewModal(false)}
+      >
+        ×
+      </button>
       <h3 className={styles.modalTitle}>Dispatch Details</h3>
 
       <p><strong>Alert Type:</strong> {selectedDispatch.alertType}</p>

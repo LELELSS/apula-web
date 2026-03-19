@@ -74,6 +74,22 @@ const timestampToMillis = (value: any) => {
   return 0;
 };
 
+const parseCoordinate = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+};
+
+const hasValidCoordinates = (lat: number | null, lng: number | null) => (
+  lat !== null &&
+  lng !== null &&
+  Math.abs(lat) <= 90 &&
+  Math.abs(lng) <= 180
+);
+
 const normalizeIncident = (id: string, data: any, source: "alerts" | "backup_requests") => {
   const type =
     data?.type ||
@@ -173,6 +189,7 @@ const AlertDispatchModal = () => {
   const [previewImageCandidates, setPreviewImageCandidates] = useState<string[]>([]);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [previewImageFailed, setPreviewImageFailed] = useState(false);
+  const [resolvedPreviewCoords, setResolvedPreviewCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   const extractGoogleDriveFileId = (url: string): string | null => {
     const filePathMatch = url.match(/\/file\/d\/([^/]+)/);
@@ -239,6 +256,96 @@ const AlertDispatchModal = () => {
 
     return base64Data ? [base64Data] : [];
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolvePreviewCoordinates = async () => {
+      if (!showAlertPreviewModal || !previewAlert) {
+        setResolvedPreviewCoords(null);
+        return;
+      }
+
+      const directLat =
+        parseCoordinate(previewAlert?.latitude) ??
+        parseCoordinate(previewAlert?.lat);
+
+      const directLng =
+        parseCoordinate(previewAlert?.longitude) ??
+        parseCoordinate(previewAlert?.lng) ??
+        parseCoordinate(previewAlert?.lon);
+
+      if (hasValidCoordinates(directLat, directLng)) {
+        if (!cancelled) {
+          setResolvedPreviewCoords({ lat: directLat as number, lng: directLng as number });
+        }
+        return;
+      }
+
+      const address =
+        String(
+          previewAlert?.userAddress ||
+          previewAlert?.location ||
+          previewAlert?.alertLocation ||
+          ""
+        ).trim();
+
+      if (!address) {
+        if (!cancelled) setResolvedPreviewCoords(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/geocode?q=${encodeURIComponent(address)}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Geocode failed with status ${response.status}`);
+        }
+
+        const payload = await response.json();
+        const first = Array.isArray(payload) ? payload[0] : null;
+
+        const geocodedLat =
+          parseCoordinate(first?.lat) ??
+          parseCoordinate(first?.latitude);
+
+        const geocodedLng =
+          parseCoordinate(first?.lon) ??
+          parseCoordinate(first?.lng) ??
+          parseCoordinate(first?.longitude);
+
+        if (!cancelled && hasValidCoordinates(geocodedLat, geocodedLng)) {
+          setResolvedPreviewCoords({ lat: geocodedLat as number, lng: geocodedLng as number });
+          return;
+        }
+      } catch (error) {
+        console.error("Failed to geocode alert preview address:", error);
+      }
+
+      if (!cancelled) {
+        setResolvedPreviewCoords(null);
+      }
+    };
+
+    resolvePreviewCoordinates();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    showAlertPreviewModal,
+    previewAlert?.id,
+    previewAlert?.latitude,
+    previewAlert?.lat,
+    previewAlert?.longitude,
+    previewAlert?.lng,
+    previewAlert?.lon,
+    previewAlert?.userAddress,
+    previewAlert?.location,
+    previewAlert?.alertLocation,
+  ]);
 
 
   const viewDispatchInfo = async (teamName: string) => {
@@ -986,35 +1093,26 @@ const getTeamStationName = (teamName: string) => {
     previewAlert?.alertLocation ||
     "";
 
-  const toNumber = (value: unknown): number | null => {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-      const parsed = Number(value);
-      if (Number.isFinite(parsed)) return parsed;
+  const mapEmbedSrc = (() => {
+    if (resolvedPreviewCoords) {
+      const { lat, lng } = resolvedPreviewCoords;
+      const delta = 0.002;
+      const bbox = [
+        lng - delta,
+        lat - delta,
+        lng + delta,
+        lat + delta,
+      ]
+        .map((value) => value.toFixed(6))
+        .join("%2C");
+
+      return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat.toFixed(6)}%2C${lng.toFixed(6)}`;
     }
-    return null;
-  };
 
-  const previewLat =
-    toNumber(previewAlert?.latitude) ??
-    toNumber(previewAlert?.lat);
-
-  const previewLng =
-    toNumber(previewAlert?.longitude) ??
-    toNumber(previewAlert?.lng) ??
-    toNumber(previewAlert?.lon);
-
-  const hasExactCoords =
-    previewLat !== null &&
-    previewLng !== null &&
-    Math.abs(previewLat) <= 90 &&
-    Math.abs(previewLng) <= 180;
-
-  const mapEmbedSrc = hasExactCoords
-    ? `https://maps.google.com/maps?q=loc:${previewLat},${previewLng}&z=17&output=embed`
-    : previewAddress
+    return previewAddress
       ? `https://maps.google.com/maps?q=${encodeURIComponent(previewAddress)}&z=15&output=embed`
       : "";
+  })();
 
   const fireType =
     previewAlert?.type ||

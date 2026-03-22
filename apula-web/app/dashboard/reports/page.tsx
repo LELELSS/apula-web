@@ -562,17 +562,20 @@ const handleSave = async () => {
                     </p>
                   )}
 
-                 {selectedReport.status === "Resolved" &&
-  (selectedReport.resolvedAt?.seconds ||
-    selectedReport.monitoringUpdatedAt?.seconds) && (
+                 {selectedReport.status === "Resolved" && (() => {
+  const resolvedTimestamp =
+    selectedReport.resolvedAt?.seconds ??
+    selectedReport.monitoringUpdatedAt?.seconds;
+
+  if (!resolvedTimestamp) return null;
+
+  return (
     <p>
       <strong>Resolved At:</strong>{" "}
-      {new Date(
-        (selectedReport.resolvedAt?.seconds ||
-          selectedReport.monitoringUpdatedAt?.seconds) * 1000
-      ).toLocaleString()}
+      {new Date(resolvedTimestamp * 1000).toLocaleString()}
     </p>
-)}
+  );
+})()}
                   {/*selectedReport.monitoringStatus && (
                     <p>
                       <strong>Monitoring Status:</strong> {selectedReport.monitoringStatus}

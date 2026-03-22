@@ -41,9 +41,7 @@ export default function AdminHeader() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentUid, setCurrentUid] = useState("");
 
-  // 🔊 SOUND STATES
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+
   const lastLoggedPathRef = useRef<string>("");
 
   const toggleSidebar = () => setSidebarOpen((prev) => !prev);
@@ -71,12 +69,7 @@ export default function AdminHeader() {
     }
   };
 
-  // 🔊 INITIALIZE LOOPING SOUND (GLOBAL)
-  useEffect(() => {
-    const audioElement = new Audio("/sounds/fire_alarm.mp3");
-    audioElement.loop = true; // keep looping
-    setAudio(audioElement);
-  }, []);
+  
 
   // 🔥 Realtime unread count (GLOBAL)
   useEffect(() => {
@@ -116,21 +109,7 @@ export default function AdminHeader() {
     };
   }, [currentUid]);
 
-  // 🔊 Play or stop sound based on unreadCount (GLOBAL)
-  useEffect(() => {
-    if (!audio) return;
-
-    if (unreadCount > 0 && !isPlaying) {
-      audio.play().catch(() => {});
-      setIsPlaying(true);
-    }
-
-    if (unreadCount === 0 && isPlaying) {
-      audio.pause();
-      audio.currentTime = 0;
-      setIsPlaying(false);
-    }
-  }, [unreadCount, audio]);
+  
 
   // 👤 Load user name/role
   useEffect(() => {

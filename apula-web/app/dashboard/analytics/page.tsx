@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import Lottie from "lottie-react";
+import fireAnimation from "@/public/lottie/fire.json";
 import AdminHeader from "@/components/shared/adminHeader";
 import styles from "./analyticsStyles.module.css";
 
@@ -76,6 +78,7 @@ const AnalyticsPage = () => {
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
 
   const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [reportChartType, setReportChartType] = useState<ChartType>("line");
   const [reportPeriod, setReportPeriod] = useState<Period>("month");
@@ -123,6 +126,8 @@ const AnalyticsPage = () => {
       if (!finalYears.includes(reportYear)) {
         setReportYear(finalYears[finalYears.length - 1]);
       }
+
+      setLoading(false);
     });
 
     return () => unsub();
@@ -630,19 +635,43 @@ Based on the available data, this report can help identify which periods experie
 
   return (
     <div>
-      <AdminHeader />
+      {loading ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "#ffffff",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 99999,
+          }}
+        >
+          <Lottie
+            animationData={fireAnimation}
+            loop={true}
+            autoplay={true}
+            style={{
+              width: 160,
+              height: 160,
+            }}
+          />
+        </div>
+      ) : (
+        <>
+          <AdminHeader />
 
-      <div style={{ position: "absolute", top: 20, right: 30, zIndex: 50 }}>
-        <AlertBellButton />
-      </div>
-
-      <AlertDispatchModal />
-
-      <div className={styles.container}>
-        <div data-aos="fade-up" className={styles.contentSection}>
-          <div className={styles.headerRow}>
-            <h2 className={styles.pageTitle}>Fire Incidents Overview</h2>
+          <div style={{ position: "absolute", top: 20, right: 30, zIndex: 50 }}>
+            <AlertBellButton />
           </div>
+
+          <AlertDispatchModal />
+
+          <div className={styles.container}>
+            <div data-aos="fade-up" className={styles.contentSection}>
+              <div className={styles.headerRow}>
+                <h2 className={styles.pageTitle}>Fire Incidents Overview</h2>
+              </div>
 
           <hr className={styles.separator} />
 
@@ -860,6 +889,8 @@ Based on the available data, this report can help identify which periods experie
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

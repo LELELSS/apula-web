@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Lottie from "lottie-react";
+import fireAnimation from "@/public/lottie/fire.json";
 import AdminHeader from "@/components/shared/adminHeader";
 import styles from "./adminDashboardStyles.module.css";
 
@@ -40,6 +42,10 @@ type ChartPoint = {
 };
 
 const AdminDashboard = () => {
+  /* ================= LOADING STATE ================= */
+  const [loading, setLoading] = useState(true);
+  const [dataLoadCount, setDataLoadCount] = useState(0);
+
   /* ================= COUNTERS ================= */
   const [activeAlertCount, setActiveAlertCount] = useState(0);
   const [availableResponders, setAvailableResponders] = useState(0);
@@ -85,6 +91,7 @@ const AdminDashboard = () => {
 
     const unsub = onSnapshot(q, (snap) => {
       setActiveAlertCount(snap.size);
+      setDataLoadCount(prev => prev + 1);
     });
 
     return () => unsub();
@@ -107,6 +114,7 @@ const AdminDashboard = () => {
 
       setAvailableResponders(available);
       setDispatchedResponders(dispatched);
+      setDataLoadCount(prev => prev + 1);
     });
 
     return () => unsub();
@@ -123,6 +131,7 @@ const AdminDashboard = () => {
       });
 
       setAvailableTeams(teams);
+      setDataLoadCount(prev => prev + 1);
     });
 
     return () => unsub();
@@ -139,6 +148,7 @@ const AdminDashboard = () => {
       });
 
       setAvailableTrucks(trucks);
+      setDataLoadCount(prev => prev + 1);
     });
 
     return () => unsub();
@@ -175,6 +185,7 @@ const AdminDashboard = () => {
       if (years.length > 0 && !years.includes(selectedYear)) {
         setSelectedYear(years[0]);
       }
+      setDataLoadCount(prev => prev + 1);
     });
 
     return () => unsub();
@@ -216,10 +227,18 @@ const AdminDashboard = () => {
       });
 
       setResolvedTodayCount(count);
+      setDataLoadCount(prev => prev + 1);
     });
 
     return () => unsub();
   }, []);
+
+  /* ================= CHECK LOADING ================= */
+  useEffect(() => {
+    if (dataLoadCount >= 6) {
+      setLoading(false);
+    }
+  }, [dataLoadCount]);
 
   /* ================= PERIOD AGGREGATION ================= */
   useEffect(() => {
@@ -340,63 +359,87 @@ const AdminDashboard = () => {
 
   return (
     <div>
-      <AdminHeader />
+      {loading ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "#ffffff",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 99999,
+          }}
+        >
+          <Lottie
+            animationData={fireAnimation}
+            loop={true}
+            autoplay={true}
+            style={{
+              width: 160,
+              height: 160,
+            }}
+          />
+        </div>
+      ) : (
+        <>
+          <AdminHeader />
 
-      <div style={{ position: "absolute", top: 20, right: 30, zIndex: 50 }}>
-        <AlertBellButton />
-      </div>
-
-      <AlertDispatchModal />
-
-      <div className={styles.container}>
-        <div className={styles.contentSection}>
-          <h2 className={styles.pageTitle}>Fire Command Center</h2>
-          <hr className={styles.separator} />
-
-          {/* ROW 1 */}
-          <div className={styles.row}>
-            <div className={styles.cardCritical}>
-              <div className={styles.cardTop}>
-                <FaFire className={styles.cardIcon} />
-                <p className={styles.bigNumber}>{activeAlertCount}</p>
-              </div>
-              <span className={styles.cardLabel}>Active Fire Incidents</span>
-            </div>
-
-            <div className={styles.cardSuccess}>
-              <div className={styles.cardTop}>
-                <FaUsers className={styles.cardIcon} />
-                <p className={styles.bigNumber}>{availableTeams}</p>
-              </div>
-              <span className={styles.cardLabel}>Available Teams</span>
-            </div>
-
-            <div className={styles.card}>
-              <div className={styles.cardTop}>
-                <FaTruck className={styles.cardIcon} />
-                <p className={styles.bigNumber}>{availableTrucks}</p>
-              </div>
-              <span className={styles.cardLabel}>Available Trucks</span>
-            </div>
+          <div style={{ position: "absolute", top: 20, right: 30, zIndex: 50 }}>
+            <AlertBellButton />
           </div>
 
-          {/* ROW 2 */}
-          <div className={styles.row}>
-            <div className={styles.cardSuccess}>
-              <div className={styles.cardTop}>
-                <FaUserCheck className={styles.cardIcon} />
-                <p className={styles.bigNumber}>{availableResponders}</p>
-              </div>
-              <span className={styles.cardLabel}>Responders Available</span>
-            </div>
+          <AlertDispatchModal />
 
-            <div className={styles.cardInfo}>
-              <div className={styles.cardTop}>
-                <FaUserClock className={styles.cardIcon} />
-                <p className={styles.bigNumber}>{dispatchedResponders}</p>
+          <div className={styles.container}>
+            <div className={styles.contentSection}>
+              <h2 className={styles.pageTitle}>Fire Command Center</h2>
+              <hr className={styles.separator} />
+
+              {/* ROW 1 */}
+              <div className={styles.row}>
+                <div className={styles.cardCritical}>
+                  <div className={styles.cardTop}>
+                    <FaFire className={styles.cardIcon} />
+                    <p className={styles.bigNumber}>{activeAlertCount}</p>
+                  </div>
+                  <span className={styles.cardLabel}>Active Fire Incidents</span>
+                </div>
+
+                <div className={styles.cardSuccess}>
+                  <div className={styles.cardTop}>
+                    <FaUsers className={styles.cardIcon} />
+                    <p className={styles.bigNumber}>{availableTeams}</p>
+                  </div>
+                  <span className={styles.cardLabel}>Available Teams</span>
+                </div>
+
+                <div className={styles.card}>
+                  <div className={styles.cardTop}>
+                    <FaTruck className={styles.cardIcon} />
+                    <p className={styles.bigNumber}>{availableTrucks}</p>
+                  </div>
+                  <span className={styles.cardLabel}>Available Trucks</span>
+                </div>
               </div>
-              <span className={styles.cardLabel}>Dispatched Responders</span>
-            </div>
+
+              {/* ROW 2 */}
+              <div className={styles.row}>
+                <div className={styles.cardSuccess}>
+                  <div className={styles.cardTop}>
+                    <FaUserCheck className={styles.cardIcon} />
+                    <p className={styles.bigNumber}>{availableResponders}</p>
+                  </div>
+                  <span className={styles.cardLabel}>Responders Available</span>
+                </div>
+
+                <div className={styles.cardInfo}>
+                  <div className={styles.cardTop}>
+                    <FaUserClock className={styles.cardIcon} />
+                    <p className={styles.bigNumber}>{dispatchedResponders}</p>
+                  </div>
+                  <span className={styles.cardLabel}>Dispatched Responders</span>
+                </div>
 
             <div className={styles.cardSuccess}>
               <div className={styles.cardTop}>
@@ -493,6 +536,8 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

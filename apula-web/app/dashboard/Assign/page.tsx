@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Lottie from "lottie-react";
+import fireAnimation from "@/public/lottie/fire.json";
 import AdminHeader from "@/components/shared/adminHeader";
 import styles from "./tv.module.css";
 import { FaSearch } from "react-icons/fa";
@@ -36,22 +38,27 @@ export default function AssignPage() {
   );
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // ---------------- LOAD DATA ----------------
   useEffect(() => {
     const unsubUsers = onSnapshot(
       query(collection(db, "users"), where("role", "==", "responder")),
-      (snap) =>
-        setResponders(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      (snap) => {
+        setResponders(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      }
     );
 
-    const unsubTeams = onSnapshot(collection(db, "teams"), (snap) =>
-      setTeamList(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
-    );
+    const unsubTeams = onSnapshot(collection(db, "teams"), (snap) => {
+      setTeamList(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    });
 
-    const unsubVehicles = onSnapshot(collection(db, "vehicles"), (snap) =>
-      setVehicleList(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
-    );
+    const unsubVehicles = onSnapshot(collection(db, "vehicles"), (snap) => {
+      setVehicleList(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    });
 
     return () => {
       unsubUsers();
@@ -225,17 +232,41 @@ export default function AssignPage() {
   // ---------------- UI ----------------
   return (
     <div className={styles.pageWrapper}>
-      <AdminHeader />
+      {loading ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "#ffffff",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 99999,
+          }}
+        >
+          <Lottie
+            animationData={fireAnimation}
+            loop={true}
+            autoplay={true}
+            style={{
+              width: 160,
+              height: 160,
+            }}
+          />
+        </div>
+      ) : (
+        <div>
+          <AdminHeader />
 
-      <div style={{ position: "absolute", top: 20, right: 30 }}>
-        <AlertBellButton />
-      </div>
+          <div style={{ position: "absolute", top: 20, right: 30 }}>
+            <AlertBellButton />
+          </div>
 
-      <AlertDispatchModal />
+          <AlertDispatchModal />
 
-      <div className={styles.container}>
-        <div className={styles.contentSection}>
-          <h2 className={styles.pageTitle}>Assign Member</h2>
+          <div className={styles.container}>
+            <div className={styles.contentSection}>
+              <h2 className={styles.pageTitle}>Assign Member</h2>
 
           <div className={styles.searchWrapper}>
             <div className={styles.searchBox}>
@@ -407,6 +438,9 @@ export default function AssignPage() {
           </div>
         </div>
       )}
+
     </div>
+  )}
+</div>
   );
 }

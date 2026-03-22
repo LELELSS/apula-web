@@ -280,7 +280,7 @@
   width: 100%;
   max-width: 460px;
   height: 620px;              /* fixed height */
-  max-height: 90vh;
+  max-height: 70vh;
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
 
   display: flex;

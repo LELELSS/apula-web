@@ -49,7 +49,11 @@ const isOpenBackupRequest = (data: Record<string, unknown>) => {
   return true;
 };
 
-const AlertBellButton = () => {
+type AlertBellButtonProps = {
+  enableSound?: boolean;
+};
+
+const AlertBellButton = ({ enableSound = true }: AlertBellButtonProps) => {
   const [alertCount, setAlertCount] = useState(0);
   const [backupCount, setBackupCount] = useState(0);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
@@ -57,14 +61,19 @@ const AlertBellButton = () => {
 
   const totalCount = alertCount + backupCount;
 
-  // 🔊 Initialize alarm sound
   useEffect(() => {
+    if (!enableSound) return;
+
     const alarm = new Audio("/sounds/fire_alarm.mp3");
     alarm.loop = true;
     setAudio(alarm);
-  }, []);
 
-  // 🔥 Real-time listen to pending alerts
+    return () => {
+      alarm.pause();
+      alarm.currentTime = 0;
+    };
+  }, [enableSound]);
+
   useEffect(() => {
     const q = query(
       collection(db, "alerts"),
@@ -78,7 +87,6 @@ const AlertBellButton = () => {
     return () => unsub();
   }, []);
 
-  // 🚒 Real-time listen to pending backup requests
   useEffect(() => {
     let latestSnakeCount = 0;
     let latestCamelCount = 0;
@@ -121,21 +129,35 @@ const AlertBellButton = () => {
     };
   }, []);
 
-  // 🔊 Play sound if alerts or backup requests exist
   useEffect(() => {
-    if (!audio) return;
+    if (!enableSound || !audio) return;
 
-    if (totalCount > 0 && !isPlaying) {
+    const shouldPlayAlarm = alertCount > 0 || backupCount > 0;
+
+    if (shouldPlayAlarm && !isPlaying) {
       audio.play().catch(() => {});
       setIsPlaying(true);
     }
 
-    if (totalCount === 0 && isPlaying) {
+    if (!shouldPlayAlarm && isPlaying) {
       audio.pause();
       audio.currentTime = 0;
       setIsPlaying(false);
     }
-  }, [totalCount, audio, isPlaying]);
+  }, [alertCount, backupCount, audio, isPlaying, enableSound]);
+
+  useEffect(() => {
+    if (enableSound) return;
+
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+
+    if (isPlaying) {
+      setIsPlaying(false);
+    }
+  }, [enableSound, audio, isPlaying]);
 
   const handleClick = () => {
     window.dispatchEvent(new Event("open-alert-dispatch"));
@@ -144,8 +166,6 @@ const AlertBellButton = () => {
   return (
     <button className={styles.floatingBell} onClick={handleClick}>
       <FaBell className={styles.icon} />
-
-      {/* 🔴 Badge = alerts + backup requests */}
       {totalCount > 0 && (
         <span className={styles.badge}>{totalCount}</span>
       )}

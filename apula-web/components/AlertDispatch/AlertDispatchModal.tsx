@@ -191,6 +191,10 @@ const AlertDispatchModal = () => {
   const [previewImageFailed, setPreviewImageFailed] = useState(false);
   const [resolvedPreviewCoords, setResolvedPreviewCoords] = useState<{ lat: number; lng: number } | null>(null);
 
+
+  const [showDispatchSuccessModal, setShowDispatchSuccessModal] = useState(false);
+const [dispatchSuccessMessage, setDispatchSuccessMessage] = useState("");
+
   const extractGoogleDriveFileId = (url: string): string | null => {
     const filePathMatch = url.match(/\/file\/d\/([^/]+)/);
     if (filePathMatch?.[1]) return filePathMatch[1];
@@ -826,6 +830,18 @@ const groupedList = teams
 
     if (members.length === 0) return null;
 
+    // ✅ CHECK STATION
+    const hasStation =
+      team.stationId ||
+      team.stationName ||
+      stations.some(
+        (s) =>
+          s.id === team.stationId ||
+          s.name === team.stationName
+      );
+
+    if (!hasStation) return null; // 🚨 HIDE TEAM
+
     const vehicle =
       vehicles.find((v) => v.assignedTeamId === team.id)?.code ||
       vehicles.find((v) => v.assignedTeam === team.teamName)?.code ||
@@ -1053,7 +1069,7 @@ const getTeamStationName = (teamName: string) => {
         });
       } catch {}
 
-      if (currentUser) {
+          if (currentUser) {
         await logActivity({
           actorUid: currentUser.uid,
           actorEmail: currentUser.email || "",
@@ -1067,21 +1083,43 @@ const getTeamStationName = (teamName: string) => {
         });
       }
 
+      const dispatchedTeamNames = Array.from(
+        new Set(
+          selected.map((r) => {
+            const teamName =
+              teams.find((t) => t.id === r.teamId)?.teamName || "Unassigned";
+            return teamName;
+          })
+        )
+      );
+
+      setDispatchSuccessMessage(
+        `Successfully dispatched ${dispatchedTeamNames.join(", ")} to ${
+          selectedAlert.location || selectedAlert.userAddress || "the selected incident"
+        }.`
+      );
+
       setShowModal(false);
       setDispatchStep(1);
-    } catch (err) {
-      console.error(err);
-      alert("Dispatch failed.");
+      setSelectedAlert(null);
+      setSelectedResponderIds(new Set());
+      setShowDispatchSuccessModal(true);
+
+setTimeout(() => {
+  setShowDispatchSuccessModal(false);
+}, 2000); // 2 seconds
+    } catch (error) {
+      console.error("Failed to dispatch responders:", error);
+      alert("Failed to dispatch responders.");
     }
   };
-
-
-
   // ------------------------------------------------------------
   // UI (unchanged)
   // ------------------------------------------------------------
   
-  if (!showModal) return null;
+ if (!showModal && !showDispatchSuccessModal && !showAlertPreviewModal && !showViewModal) {
+  return null;
+}
 
   const formattedAlertTime = previewAlert?.timestamp?.seconds
     ? new Date(previewAlert.timestamp.seconds * 1000).toLocaleString()
@@ -1192,6 +1230,7 @@ const getTeamStationName = (teamName: string) => {
                     <th>Reporter</th>
                     <th>Contact</th>
                     <th>Address</th>
+                    <th>Time</th> {/* NEW */}
                     <th>Select</th>
                   </tr>
                 </thead>
@@ -1203,6 +1242,11 @@ const getTeamStationName = (teamName: string) => {
                       <td>{a.userName}</td>
                       <td>{a.userContact}</td>
                       <td>{a.userAddress}</td>
+                      <td>
+  {a.timestamp?.seconds
+    ? new Date(a.timestamp.seconds * 1000).toLocaleString()
+    : "Unknown"}
+</td>
                       <td style={{ display: "flex", gap: "8px" }}>
   <button
     className={styles.dispatchBtn}
@@ -1515,10 +1559,43 @@ const getTeamStationName = (teamName: string) => {
       </button>
     </div>
   </div>
+
+  
 )}
 
+{showDispatchSuccessModal && (
+  <div
+    className={styles.modalOverlay}
+    onClick={() => setShowDispatchSuccessModal(false)}
+  >
+    <div
+      className={styles.modalWide}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: "400px",
+        maxWidth: "90%",
+        textAlign: "center",
+        padding: "24px",
+      }}
+    >
+      <h3 className={styles.modalTitle}>Dispatch Successful</h3>
+
+      <p style={{ marginTop: "10px" }}>
+        Responders have been dispatched successfully.
+      </p>
+
+      <p style={{ fontSize: "12px", color: "#888", marginTop: "10px" }}>
+        This will close automatically...
+      </p>
     </div>
+  </div>
+)}
+    </div>
+    
   );
+
+  
+  
 };
 
 export default AlertDispatchModal;

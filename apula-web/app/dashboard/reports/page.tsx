@@ -8,6 +8,7 @@ import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
 import styles from "./reportStyles.module.css";
 import jsPDF from "jspdf";
+import { serverTimestamp } from "firebase/firestore";
 
 import {
   collection,
@@ -29,6 +30,7 @@ type ReportItem = {
   userAddress?: string;
   status?: string;
   timestamp?: { seconds: number };
+  resolvedAt?: { seconds: number }; // ✅ ADD THIS
   monitoringStatus?: string;
   monitoringMessage?: string;
   monitoringUpdatedAt?: { seconds: number };
@@ -158,12 +160,24 @@ const ReportPage = () => {
     setEditedStatus(selectedReport.status || "");
   };
 
-  const handleSave = async () => {
-    if (!selectedReport) return;
-    const ref = doc(db, "alerts", selectedReport.id);
-    await updateDoc(ref, { status: editedStatus });
-    setEditMode(false);
-  };
+const handleSave = async () => {
+  if (!selectedReport) return;
+
+  const ref = doc(db, "alerts", selectedReport.id);
+
+  if (editedStatus === "Resolved") {
+    await updateDoc(ref, {
+      status: "Resolved",
+      resolvedAt: serverTimestamp(), // ✅ SAVE TIME
+    });
+  } else {
+    await updateDoc(ref, {
+      status: editedStatus,
+    });
+  }
+
+  setEditMode(false);
+};
 
   const getTeamName = (dispatch: DispatchInfo) =>
     dispatch.responders?.[0]?.team ||
@@ -548,7 +562,18 @@ const ReportPage = () => {
                     </p>
                   )}
 
-                  {selectedReport.monitoringStatus && (
+                 {selectedReport.status === "Resolved" &&
+  (selectedReport.resolvedAt?.seconds ||
+    selectedReport.monitoringUpdatedAt?.seconds) && (
+    <p>
+      <strong>Resolved At:</strong>{" "}
+      {new Date(
+        (selectedReport.resolvedAt?.seconds ||
+          selectedReport.monitoringUpdatedAt?.seconds) * 1000
+      ).toLocaleString()}
+    </p>
+)}
+                  {/*selectedReport.monitoringStatus && (
                     <p>
                       <strong>Monitoring Status:</strong> {selectedReport.monitoringStatus}
                     </p>
@@ -570,8 +595,8 @@ const ReportPage = () => {
                     <p>
                       <strong>Monitoring Updated At:</strong>{" "}
                       {new Date(selectedReport.monitoringUpdatedAt.seconds * 1000).toLocaleString()}
-                    </p>
-                  )}
+                    </p>*/}
+               
                 </div>
 
                 {dispatches.length > 0 && (

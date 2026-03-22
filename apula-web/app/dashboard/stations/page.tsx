@@ -541,6 +541,18 @@ export default function StationsPage() {
     }
   };
 
+
+  const [stationToDelete, setStationToDelete] = useState<StationRecord | null>(null);
+  const confirmDeleteStation = async () => {
+  if (!stationToDelete) {
+    return;
+  }
+
+  await deleteStation(stationToDelete);
+  setStationToDelete(null);
+};
+
+
   return (
     <div className={styles.pageWrapper}>
       <AdminHeader />
@@ -648,11 +660,11 @@ export default function StationsPage() {
                             Edit
                           </button>
                           <button
-                            className={styles.deleteBtn}
-                            onClick={() => deleteStation(station)}
-                          >
-                            Delete
-                          </button>
+  className={styles.deleteBtn}
+  onClick={() => setStationToDelete(station)}
+>
+  Delete
+</button>
                         </div>
                       </td>
                     </tr>
@@ -797,6 +809,37 @@ export default function StationsPage() {
           {errorMessage}
         </div>
       )}
+
+      {stationToDelete && (
+  <div className={styles.modalOverlay} onClick={() => setStationToDelete(null)}>
+    <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+      <h3 className={styles.modalTitle}>Confirm Delete</h3>
+
+      <p className={styles.helpText}>
+        Are you sure you want to delete <strong>{stationToDelete.name}</strong>?
+      </p>
+
+      <p className={styles.helpText}>
+        This will also unassign linked teams, vehicles, and responders from this station.
+      </p>
+
+      <div className={styles.modalActions}>
+        <button
+          className={styles.closeBtn}
+          onClick={() => setStationToDelete(null)}
+        >
+          Cancel
+        </button>
+        <button
+          className={styles.deleteBtn}
+          onClick={confirmDeleteStation}
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }

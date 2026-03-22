@@ -151,13 +151,14 @@ if (!selectedLeader) {
     });
 
     // ✅ UPDATE LEADER USER (NO VEHICLE HERE)
-    batch.update(doc(db, "users", leader.id), {
-      teamId: teamRef.id,
-      teamName: newTeamName.trim(),
-      vehicleId: "",
-      vehicleCode: "",
-      vehiclePlate: "",
-    });
+   batch.update(doc(db, "users", leader.id), {
+  teamId: teamRef.id,
+  teamName: newTeamName.trim(),
+  vehicleId: "",
+  vehicleCode: "",
+  vehiclePlate: "",
+  status: "Available",
+});
 
     await batch.commit();
 
@@ -175,44 +176,63 @@ if (!selectedLeader) {
   // ------------------------------------------
   // Create vehicle
   // ------------------------------------------
-  const createVehicle = async () => {
+ const createVehicle = async () => {
   if (!vehicleCode.trim()) {
-  setErrorMessage("Please enter vehicle code.");
-  return;
-}
+    setErrorMessage("Please enter vehicle code.");
+    return;
+  }
 
-if (!vehiclePlate.trim()) {
-  setErrorMessage("Please enter plate number.");
-  return;
-}
+  if (!vehiclePlate.trim()) {
+    setErrorMessage("Please enter plate number.");
+    return;
+  }
 
-if (!vehicleTeam.trim()) {
-  setErrorMessage("Please select an assigned team.");
-  return;
-}
+  if (!vehicleTeam.trim()) {
+    setErrorMessage("Please select an assigned team.");
+    return;
+  }
 
-    try {
-      // store assignedTeamName for easy queries/display
-      const teamDoc = teams.find((t) => t.id === vehicleTeam);
-      await addDoc(collection(db, "vehicles"), {
-        code: vehicleCode.trim(),
-        plate: vehiclePlate.trim(),
-        assignedTeamId: vehicleTeam,
-        assignedTeam: teamDoc ? teamDoc.teamName : "",
-        status: "Available",
-        createdAt: serverTimestamp(),
+  try {
+    const batch = writeBatch(db);
+
+    const teamDoc = teams.find((t) => t.id === vehicleTeam);
+    const vehicleRef = doc(collection(db, "vehicles"));
+
+    batch.set(vehicleRef, {
+      code: vehicleCode.trim(),
+      plate: vehiclePlate.trim(),
+      assignedTeamId: vehicleTeam,
+      assignedTeam: teamDoc ? teamDoc.teamName : "",
+      status: "Available",
+      createdAt: serverTimestamp(),
+    });
+
+    const usersQuery = query(
+      collection(db, "users"),
+      where("teamId", "==", vehicleTeam)
+    );
+    const usersSnap = await getDocs(usersQuery);
+
+    usersSnap.docs.forEach((d) => {
+      batch.update(doc(db, "users", d.id), {
+        vehicleId: vehicleRef.id,
+        vehicleCode: vehicleCode.trim(),
+        vehiclePlate: vehiclePlate.trim(),
       });
+    });
 
-      setVehicleCode("");
-      setVehiclePlate("");
-      setVehicleTeam("");
-      setShowAddVehicleModal(false);
-      setSuccessMessage("Vehicle added successfully.");
-    } catch (err) {
-      console.error(err);
-      setErrorMessage("Error adding vehicle.");
-    }
-  };
+    await batch.commit();
+
+    setVehicleCode("");
+    setVehiclePlate("");
+    setVehicleTeam("");
+    setShowAddVehicleModal(false);
+    setSuccessMessage("Vehicle added successfully.");
+  } catch (err) {
+    console.error(err);
+    setErrorMessage("Error adding vehicle.");
+  }
+};
 
   // ------------------------------------------
   // Open Edit Team modal
@@ -233,48 +253,25 @@ if (!vehicleTeam.trim()) {
   if (!editingTeam) return;
 
   try {
+    const oldTeam = teams.find((t) => t.id === editingTeam.id);
+    const oldLeaderId = oldTeam?.leaderId || "";
+
     const teamRef = doc(db, "teams", editingTeam.id);
-
-    const oldLeaderId = editingTeam.leaderId;
-    const newLeaderId = editingTeam.leaderId;
-
     const batch = writeBatch(db);
 
-    let updatedMembers = (editingTeam.members || []).filter(
-      (m: any) => m.id === newLeaderId
-    );
+    const newLeaderId = editingTeam.leaderId;
+    const newLeader = responders.find((r) => r.id === newLeaderId);
 
-    const newLeader = responders.find(r => r.id === newLeaderId);
-    if (newLeader) {
-      updatedMembers = [
-        {
-          id: newLeader.id,
-          name: newLeader.name,
-          status: newLeader.status || "Available",
-          teamName: editingTeam.teamName,
-        },
-      ];
-
-      batch.update(doc(db, "users", newLeader.id), {
-        teamId: editingTeam.id,
-        teamName: editingTeam.teamName,
-      });
-    }
-
-    // Clear users no longer in team
-    const q = query(
-      collection(db, "users"),
-      where("teamId", "==", editingTeam.id)
-    );
-    const snap = await getDocs(q);
-    snap.docs.forEach(d => {
-      if (d.id !== newLeaderId) {
-        batch.update(doc(db, "users", d.id), {
-          teamId: "",
-          teamName: "",
-        });
-      }
-    });
+    const updatedMembers = newLeader
+      ? [
+          {
+            id: newLeader.id,
+            name: newLeader.name,
+            status: editingTeam.status || "Available",
+            teamName: editingTeam.teamName,
+          },
+        ]
+      : [];
 
     batch.update(teamRef, {
       teamName: editingTeam.teamName,
@@ -284,7 +281,53 @@ if (!vehicleTeam.trim()) {
       status: editingTeam.status,
     });
 
+    const respondersQuery = query(
+      collection(db, "users"),
+      where("teamId", "==", editingTeam.id)
+    );
+    const respondersSnap = await getDocs(respondersQuery);
+
+    respondersSnap.docs.forEach((userDoc) => {
+      batch.update(doc(db, "users", userDoc.id), {
+        teamName: editingTeam.teamName,
+        status: editingTeam.status,
+      });
+    });
+
+    if (oldLeaderId && oldLeaderId !== newLeaderId) {
+      batch.update(doc(db, "users", oldLeaderId), {
+        teamId: "",
+        teamName: "",
+        vehicleId: "",
+        vehicleCode: "",
+        vehiclePlate: "",
+        status: "Available",
+      });
+    }
+
+    if (newLeader) {
+      batch.update(doc(db, "users", newLeader.id), {
+        teamId: editingTeam.id,
+        teamName: editingTeam.teamName,
+        status: editingTeam.status,
+      });
+    }
+
+    const vehiclesQuery = query(
+      collection(db, "vehicles"),
+      where("assignedTeamId", "==", editingTeam.id)
+    );
+    const vehiclesSnap = await getDocs(vehiclesQuery);
+
+    vehiclesSnap.docs.forEach((vehicleDoc) => {
+      batch.update(doc(db, "vehicles", vehicleDoc.id), {
+        assignedTeam: editingTeam.teamName,
+        status: editingTeam.status,
+      });
+    });
+
     await batch.commit();
+
     setEditingTeam(null);
     setSuccessMessage("Team updated successfully.");
   } catch (err) {
@@ -300,33 +343,43 @@ const [confirmDelete, setConfirmDelete] = useState<{
 } | null>(null);
 
   // Delete team
-  const deleteTeam = async (teamId: string) => {
+ const deleteTeam = async (teamId: string) => {
+  try {
+    const usersQuery = query(collection(db, "users"), where("teamId", "==", teamId));
+    const usersSnap = await getDocs(usersQuery);
 
-    try {
-      // find users assigned to this team (by teamId)
-      const q = query(collection(db, "users"), where("teamId", "==", teamId));
-      const snap = await getDocs(q);
-      const batch = writeBatch(db);
+    const vehiclesQuery = query(collection(db, "vehicles"), where("assignedTeamId", "==", teamId));
+    const vehiclesSnap = await getDocs(vehiclesQuery);
 
-      // clear user team fields
-      snap.docs.forEach((d) => {
-        const uref = doc(db, "users", d.id);
-        batch.update(uref, {
-          teamId: "",
-          teamName: "",
-        });
+    const batch = writeBatch(db);
+
+    usersSnap.docs.forEach((d) => {
+      batch.update(doc(db, "users", d.id), {
+        teamId: "",
+        teamName: "",
+        vehicleId: "",
+        vehicleCode: "",
+        vehiclePlate: "",
+        status: "Available",
       });
+    });
 
-      // delete team doc
-      const tref = doc(db, "teams", teamId);
-      batch.delete(tref);
+    vehiclesSnap.docs.forEach((d) => {
+      batch.update(doc(db, "vehicles", d.id), {
+        assignedTeamId: "",
+        assignedTeam: "",
+        status: "Available",
+      });
+    });
 
-      await batch.commit();
-    } catch (err) {
-      console.error(err);
-      setErrorMessage("Error deleting team.");
-    }
-  };
+    batch.delete(doc(db, "teams", teamId));
+
+    await batch.commit();
+  } catch (err) {
+    console.error(err);
+    setErrorMessage("Error deleting team.");
+  }
+};
 
   // ------------------------------------------
   // Open Edit Vehicle modal
@@ -351,26 +404,43 @@ const [confirmDelete, setConfirmDelete] = useState<{
     const batch = writeBatch(db);
     const vehicleRef = doc(db, "vehicles", editingVehicle.id);
 
-    const team = teams.find(t => t.id === editingVehicle.assignedTeamId);
+    const oldVehicle = vehicles.find((v) => v.id === editingVehicle.id);
+    const oldAssignedTeamId = oldVehicle?.assignedTeamId || "";
 
-    // ✅ Update vehicle doc
+    const newTeam = teams.find((t) => t.id === editingVehicle.assignedTeamId);
+
     batch.update(vehicleRef, {
       code: editingVehicle.code,
       plate: editingVehicle.plate,
-      assignedTeamId: team?.id || "",
-      assignedTeam: team?.teamName || "",
+      assignedTeamId: newTeam?.id || "",
+      assignedTeam: newTeam?.teamName || "",
       status: editingVehicle.status || "Available",
     });
 
-    // ✅ CRITICAL FIX: UPDATE ALL USERS IN TEAM (INCLUDING LEADER)
-    if (team) {
-      const q = query(
+    if (oldAssignedTeamId && oldAssignedTeamId !== editingVehicle.assignedTeamId) {
+      const oldUsersQuery = query(
         collection(db, "users"),
-        where("teamId", "==", team.id)
+        where("teamId", "==", oldAssignedTeamId)
       );
-      const snap = await getDocs(q);
+      const oldUsersSnap = await getDocs(oldUsersQuery);
 
-      snap.docs.forEach(d => {
+      oldUsersSnap.docs.forEach((d) => {
+        batch.update(doc(db, "users", d.id), {
+          vehicleId: "",
+          vehicleCode: "",
+          vehiclePlate: "",
+        });
+      });
+    }
+
+    if (newTeam) {
+      const newUsersQuery = query(
+        collection(db, "users"),
+        where("teamId", "==", newTeam.id)
+      );
+      const newUsersSnap = await getDocs(newUsersQuery);
+
+      newUsersSnap.docs.forEach((d) => {
         batch.update(doc(db, "users", d.id), {
           vehicleId: editingVehicle.id,
           vehicleCode: editingVehicle.code,
@@ -384,10 +454,9 @@ const [confirmDelete, setConfirmDelete] = useState<{
     setSuccessMessage("Vehicle updated successfully.");
   } catch (err) {
     console.error(err);
-   setErrorMessage("Failed to update vehicle.");
+    setErrorMessage("Failed to update vehicle.");
   }
 };
-
 
 
 

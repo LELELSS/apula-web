@@ -13,6 +13,7 @@ import {
   onSnapshot,
   updateDoc,
   doc,
+  getDoc,
   arrayUnion,
 } from "firebase/firestore";
 
@@ -131,20 +132,14 @@ const NotificationPage: React.FC = () => {
   const [bulkActionTarget, setBulkActionTarget] = useState<"all" | "filtered" | null>(null);
 
   /* 🔊 SOUND STATES */
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+
   const [currentUid, setCurrentUid] = useState("");
 
   /* PAGINATION */
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  /* SOUND INITIALIZE */
-  useEffect(() => {
-    const audioElement = new Audio("/sounds/fire_alarm.mp3");
-    audioElement.loop = true;
-    setAudio(audioElement);
-  }, []);
+  
 
   /* REALTIME ALERT LISTENER */
   useEffect(() => {
@@ -177,15 +172,17 @@ const NotificationPage: React.FC = () => {
     );
 
     const unsubscribeBackupRequests = onSnapshot(
-      collection(db, "backup_requests"),
-      (snapshot) => {
-        latestBackupRequests = snapshot.docs.map((d) =>
-          normalizeNotification(d.id, d.data(), "backup_requests")
-        );
-        syncNotifications();
-      },
-      (err) => console.error("backup_requests onSnapshot error:", err)
+  collection(db, "backup_requests"),
+  async (snapshot) => {
+    latestBackupRequests = await Promise.all(
+      snapshot.docs.map((d) =>
+        normalizeBackupRequestWithAlert(d.id, d.data())
+      )
     );
+    syncNotifications();
+  },
+  (err) => console.error("backup_requests onSnapshot error:", err)
+);
 
     const unsubscribeSystemNotifs = onSnapshot(
       collection(db, "notifications"),
@@ -205,25 +202,55 @@ const NotificationPage: React.FC = () => {
     };
   }, []);
 
-  /* SOUND LOGIC */
-  useEffect(() => {
-    if (!audio) return;
 
-    const hasUnread = currentUid
-      ? notifications.some((n) => !isReadByUser(n, currentUid))
-      : false;
+  const normalizeBackupRequestWithAlert = async (id: string, data: any) => {
+  let alertLocation = data?.location || data?.alertLocation || "Unknown Location";
+  let alertAddress = data?.userAddress || data?.address || "N/A";
+  let alertDescription = data?.description || data?.reason || data?.details || "";
 
-    if (hasUnread && !isPlaying) {
-      audio.play().catch(() => {});
-      setIsPlaying(true);
+  if (data?.alertId) {
+    try {
+      const alertRef = doc(db, "alerts", data.alertId);
+      const alertSnap = await getDoc(alertRef);
+
+      if (alertSnap.exists()) {
+        const alertData = alertSnap.data();
+
+        alertLocation =
+          alertData?.location ||
+          alertData?.alertLocation ||
+          alertData?.userAddress ||
+          alertData?.address ||
+          data?.location ||
+          "Unknown Location";
+
+        alertAddress =
+          alertData?.userAddress ||
+          alertData?.address ||
+          alertData?.location ||
+          data?.userAddress ||
+          "N/A";
+
+        alertDescription =
+          data?.reason ||
+          alertData?.description ||
+          alertData?.details ||
+          alertData?.message ||
+          "";
+      }
+    } catch (error) {
+      console.error("Failed to fetch linked alert for backup request:", error);
     }
+  }
 
-    if (!hasUnread && isPlaying) {
-      audio.pause();
-      audio.currentTime = 0;
-      setIsPlaying(false);
-    }
-  }, [notifications, audio, currentUid]);
+  return {
+    ...normalizeNotification(id, data, "backup_requests"),
+    location: alertLocation,
+    userAddress: alertAddress,
+    description: alertDescription,
+  };
+};
+ 
 
   /* RESET PAGE WHEN FILTER CHANGES */
   useEffect(() => {

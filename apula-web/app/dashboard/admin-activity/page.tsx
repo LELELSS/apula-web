@@ -30,6 +30,9 @@ export default function AdminActivityPage() {
   const [searchText, setSearchText] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
@@ -39,7 +42,9 @@ export default function AdminActivityPage() {
       }
 
       try {
-        const userSnap = await getDocs(query(collection(db, "users"), where("email", "==", user.email)));
+        const userSnap = await getDocs(
+          query(collection(db, "users"), where("email", "==", user.email))
+        );
         const first = userSnap.docs[0];
         const nextRole = String(first?.data()?.role || "");
         setRole(nextRole);
@@ -53,7 +58,11 @@ export default function AdminActivityPage() {
           query(collection(db, "admin_activity_logs"), orderBy("createdAt", "desc"))
         );
 
-        setLogs(logsSnap.docs.map((docSnap: any) => ({ id: docSnap.id, ...docSnap.data() } as ActivityLog)));
+        setLogs(
+          logsSnap.docs.map(
+            (docSnap: any) => ({ id: docSnap.id, ...docSnap.data() } as ActivityLog)
+          )
+        );
       } catch (error) {
         console.error("Error loading activity logs:", error);
       } finally {
@@ -177,7 +186,11 @@ export default function AdminActivityPage() {
       const createdDate = new Date(createdMs);
 
       if (dateFilter === "today") {
-        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const startOfDay = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate()
+        ).getTime();
         if (createdMs < startOfDay) return false;
       }
 
@@ -224,6 +237,14 @@ export default function AdminActivityPage() {
 
     return searchBlob.includes(query);
   });
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchText, actionFilter, dateFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / itemsPerPage));
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedLogs = filteredLogs.slice(startIndex, startIndex + itemsPerPage);
 
   return (
     <div className={styles.pageWrap}>
@@ -309,34 +330,62 @@ export default function AdminActivityPage() {
               {filteredLogs.length === 0 ? (
                 <p className={styles.note}>No logs match your filter or search.</p>
               ) : (
-                <div className={styles.tableWrap}>
-                  <table className={styles.table}>
-                    <thead>
-                      <tr>
-                        <th>Time</th>
-                        <th>Actor</th>
-                        <th>Role</th>
-                        <th>Action</th>
-                        <th>Target</th>
-                        <th>Details</th>
-                        <th>Path</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredLogs.map((log: ActivityLog) => (
-                        <tr key={log.id}>
-                          <td>{formatTime(log.createdAt)}</td>
-                          <td>{log.actorName || log.actorEmail || "N/A"}</td>
-                          <td>{log.actorRole || "N/A"}</td>
-                          <td>{formatAction(log.action)}</td>
-                          <td>{formatTarget(log.targetType, log.targetId)}</td>
-                          <td>{formatDetails(log.details, log.path, log.action)}</td>
-                          <td>{formatPath(log.path)}</td>
+                <>
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th>Time</th>
+                          <th>Actor</th>
+                          <th>Role</th>
+                          <th>Action</th>
+                          <th>Target</th>
+                          <th>Details</th>
+                          <th>Path</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {paginatedLogs.map((log: ActivityLog) => (
+                          <tr key={log.id}>
+                            <td>{formatTime(log.createdAt)}</td>
+                            <td>{log.actorName || log.actorEmail || "N/A"}</td>
+                            <td>{log.actorRole || "N/A"}</td>
+                            <td>{formatAction(log.action)}</td>
+                            <td>{formatTarget(log.targetType, log.targetId)}</td>
+                            <td>{formatDetails(log.details, log.path, log.action)}</td>
+                            <td>{formatPath(log.path)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className={styles.pagination}>
+                    <button
+                      className={styles.pageBtn}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.max(prev - 1, 1))
+                      }
+                      disabled={currentPage === 1}
+                    >
+                      Prev
+                    </button>
+
+                    <span className={styles.pageInfo}>
+                      Page {currentPage} of {totalPages}
+                    </span>
+
+                    <button
+                      className={styles.pageBtn}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                      }
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           )}

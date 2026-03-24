@@ -49,10 +49,13 @@ export default function StationsPage() {
   const [showAddStationModal, setShowAddStationModal] = useState(false);
   const [stationName, setStationName] = useState("");
   const [stationAddress, setStationAddress] = useState("");
-  const [stationCoordinates, setStationCoordinates] = useState<LatLngValue | null>(null);
+  const [stationCoordinates, setStationCoordinates] =
+    useState<LatLngValue | null>(null);
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
 
-  const [editingStation, setEditingStation] = useState<StationRecord | null>(null);
+  const [editingStation, setEditingStation] = useState<StationRecord | null>(
+    null,
+  );
   const [editStationName, setEditStationName] = useState("");
   const [editStationAddress, setEditStationAddress] = useState("");
 
@@ -62,10 +65,17 @@ export default function StationsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [stationToDelete, setStationToDelete] = useState<StationRecord | null>(
+    null,
+  );
+
   useEffect(() => {
     const unsubStations = onSnapshot(collection(db, "stations"), (snap) => {
       setStations(
-        snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<StationRecord, "id">) }))
+        snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<StationRecord, "id">),
+        })),
       );
     });
 
@@ -85,28 +95,28 @@ export default function StationsPage() {
   }, []);
 
   const sortedStations = useMemo(
-    () => [...stations].sort((a, b) => (a.name || "").localeCompare(b.name || "")),
-    [stations]
+    () =>
+      [...stations].sort((a, b) => (a.name || "").localeCompare(b.name || "")),
+    [stations],
   );
 
   const availableVehicles = useMemo(
     () => vehicles.filter((vehicle) => !String(vehicle.stationId || "").trim()),
-    [vehicles]
+    [vehicles],
   );
 
   const editingStationVehicleIds = useMemo(() => {
-    if (!editingStation) {
-      return [] as string[];
-    }
+    if (!editingStation) return [] as string[];
     return editingStation.vehicleIds || [];
   }, [editingStation]);
 
   useEffect(() => {
-    if (!selectedVehicleId) {
-      return;
-    }
+    if (!selectedVehicleId) return;
 
-    const stillAvailable = availableVehicles.some((vehicle) => vehicle.id === selectedVehicleId);
+    const stillAvailable = availableVehicles.some(
+      (vehicle) => vehicle.id === selectedVehicleId,
+    );
+
     if (!stillAvailable) {
       setSelectedVehicleId("");
     }
@@ -115,14 +125,15 @@ export default function StationsPage() {
   const reverseGeocode = async (coords: LatLngValue) => {
     try {
       const response = await fetch(
-        `/api/reverse-geocode?lat=${coords.lat}&lng=${coords.lng}`
+        `/api/reverse-geocode?lat=${coords.lat}&lng=${coords.lng}`,
       );
 
       const result = await response.json().catch(() => null);
 
       if (!response.ok) {
         setErrorMessage(
-          result?.error || "Map pin saved. Please enter or confirm the address manually."
+          result?.error ||
+            "Map pin saved. Please enter or confirm the address manually.",
         );
         return;
       }
@@ -131,10 +142,14 @@ export default function StationsPage() {
         setStationAddress(result.display_name);
         setSuccessMessage("Map pin saved and address updated.");
       } else {
-        setSuccessMessage("Map pin saved. Please confirm the address manually.");
+        setSuccessMessage(
+          "Map pin saved. Please confirm the address manually.",
+        );
       }
     } catch {
-      setSuccessMessage("Map pin saved. Please enter or confirm the address manually.");
+      setSuccessMessage(
+        "Map pin saved. Please enter or confirm the address manually.",
+      );
     }
   };
 
@@ -148,7 +163,7 @@ export default function StationsPage() {
 
     try {
       const response = await fetch(
-        `/api/geocode?q=${encodeURIComponent(stationAddress.trim())}`
+        `/api/geocode?q=${encodeURIComponent(stationAddress.trim())}`,
       );
 
       const result = await response.json().catch(() => null);
@@ -159,15 +174,19 @@ export default function StationsPage() {
       }
 
       if (!Array.isArray(result) || result.length === 0) {
-        setErrorMessage("Address not found on map. Try a more specific address.");
+        setErrorMessage(
+          "Address not found on map. Try a more specific address.",
+        );
         return;
       }
 
       const first = result[0];
       setStationCoordinates({ lat: Number(first.lat), lng: Number(first.lon) });
+
       if (first.display_name) {
         setStationAddress(first.display_name);
       }
+
       setSuccessMessage("Address found and pinned on the map.");
     } catch {
       setErrorMessage("Failed to search address on map.");
@@ -186,7 +205,7 @@ export default function StationsPage() {
       const batch = writeBatch(db);
 
       const teamsSnap = await getDocs(
-        query(collection(db, "teams"), where("stationId", "==", station.id))
+        query(collection(db, "teams"), where("stationId", "==", station.id)),
       );
       teamsSnap.docs.forEach((teamDoc) => {
         batch.update(doc(db, "teams", teamDoc.id), {
@@ -196,7 +215,7 @@ export default function StationsPage() {
       });
 
       const vehiclesSnap = await getDocs(
-        query(collection(db, "vehicles"), where("stationId", "==", station.id))
+        query(collection(db, "vehicles"), where("stationId", "==", station.id)),
       );
       vehiclesSnap.docs.forEach((vehicleDoc) => {
         batch.update(doc(db, "vehicles", vehicleDoc.id), {
@@ -206,7 +225,7 @@ export default function StationsPage() {
       });
 
       const usersSnap = await getDocs(
-        query(collection(db, "users"), where("stationId", "==", station.id))
+        query(collection(db, "users"), where("stationId", "==", station.id)),
       );
       usersSnap.docs.forEach((userDoc) => {
         batch.update(doc(db, "users", userDoc.id), {
@@ -236,7 +255,9 @@ export default function StationsPage() {
     }
 
     if (!stationCoordinates) {
-      setErrorMessage("Please pin the station on the map or search the address.");
+      setErrorMessage(
+        "Please pin the station on the map or search the address.",
+      );
       return;
     }
 
@@ -278,9 +299,7 @@ export default function StationsPage() {
   };
 
   const saveEditedStation = async () => {
-    if (!editingStation) {
-      return;
-    }
+    if (!editingStation) return;
 
     if (!editStationName.trim()) {
       setErrorMessage("Please enter station name.");
@@ -305,9 +324,24 @@ export default function StationsPage() {
 
       if (nextName !== prevName) {
         const [teamsSnap, vehiclesSnap, usersSnap] = await Promise.all([
-          getDocs(query(collection(db, "teams"), where("stationId", "==", editingStation.id))),
-          getDocs(query(collection(db, "vehicles"), where("stationId", "==", editingStation.id))),
-          getDocs(query(collection(db, "users"), where("stationId", "==", editingStation.id))),
+          getDocs(
+            query(
+              collection(db, "teams"),
+              where("stationId", "==", editingStation.id),
+            ),
+          ),
+          getDocs(
+            query(
+              collection(db, "vehicles"),
+              where("stationId", "==", editingStation.id),
+            ),
+          ),
+          getDocs(
+            query(
+              collection(db, "users"),
+              where("stationId", "==", editingStation.id),
+            ),
+          ),
         ]);
 
         teamsSnap.docs.forEach((teamDoc) => {
@@ -339,9 +373,7 @@ export default function StationsPage() {
   };
 
   const removeVehicleFromStation = async (vehicleId: string) => {
-    if (!editingStation) {
-      return;
-    }
+    if (!editingStation) return;
 
     const station = stations.find((item) => item.id === editingStation.id);
     const vehicle = vehicles.find((item) => item.id === vehicleId);
@@ -355,22 +387,27 @@ export default function StationsPage() {
       ? teams.find((item) => item.id === vehicle.assignedTeamId)
       : null;
 
-    const targetTeamByName = !targetTeamById && vehicle.assignedTeam
-      ? teams.find((item) => item.teamName === vehicle.assignedTeam)
-      : null;
+    const targetTeamByName =
+      !targetTeamById && vehicle.assignedTeam
+        ? teams.find((item) => item.teamName === vehicle.assignedTeam)
+        : null;
 
     const targetTeam = targetTeamById || targetTeamByName;
 
     try {
-      const nextVehicleIds = (station.vehicleIds || []).filter((id) => id !== vehicleId);
+      const nextVehicleIds = (station.vehicleIds || []).filter(
+        (id) => id !== vehicleId,
+      );
       const nextVehicleCodes = (station.vehicleCodes || []).filter(
-        (code) => code !== vehicle.code
+        (code) => code !== vehicle.code,
       );
       const nextTeamIds = targetTeam
         ? (station.teamIds || []).filter((id) => id !== targetTeam.id)
         : station.teamIds || [];
       const nextTeamNames = targetTeam
-        ? (station.teamNames || []).filter((name) => name !== targetTeam.teamName)
+        ? (station.teamNames || []).filter(
+            (name) => name !== targetTeam.teamName,
+          )
         : station.teamNames || [];
 
       const batch = writeBatch(db);
@@ -395,14 +432,15 @@ export default function StationsPage() {
       }
 
       const usersSnap = await getDocs(
-        query(collection(db, "users"), where("stationId", "==", station.id))
+        query(collection(db, "users"), where("stationId", "==", station.id)),
       );
 
       usersSnap.docs.forEach((userDoc) => {
         const userData = userDoc.data() as Record<string, unknown>;
         const sameVehicle = userData.vehicleId === vehicle.id;
         const sameTeam = targetTeam
-          ? userData.teamId === targetTeam.id || userData.teamName === targetTeam.teamName
+          ? userData.teamId === targetTeam.id ||
+            userData.teamName === targetTeam.teamName
           : false;
 
         if (sameVehicle || sameTeam) {
@@ -419,9 +457,7 @@ export default function StationsPage() {
       await batch.commit();
 
       setEditingStation((prev) => {
-        if (!prev || prev.id !== station.id) {
-          return prev;
-        }
+        if (!prev || prev.id !== station.id) return prev;
 
         return {
           ...prev,
@@ -432,7 +468,9 @@ export default function StationsPage() {
         };
       });
 
-      setSuccessMessage("Vehicle, linked team, and responders were removed from this station.");
+      setSuccessMessage(
+        "Vehicle, linked team, and responders were removed from this station.",
+      );
     } catch (err) {
       console.error(err);
       setErrorMessage("Failed to remove vehicle assignment from station.");
@@ -452,9 +490,10 @@ export default function StationsPage() {
       ? teams.find((t) => t.id === targetVehicle.assignedTeamId)
       : null;
 
-    const targetTeamByName = !targetTeamById && targetVehicle?.assignedTeam
-      ? teams.find((t) => t.teamName === targetVehicle.assignedTeam)
-      : null;
+    const targetTeamByName =
+      !targetTeamById && targetVehicle?.assignedTeam
+        ? teams.find((t) => t.teamName === targetVehicle.assignedTeam)
+        : null;
 
     const targetTeam = targetTeamById || targetTeamByName;
 
@@ -465,7 +504,7 @@ export default function StationsPage() {
 
     if (!targetTeam) {
       setErrorMessage(
-        "The selected vehicle has no linked responder team. Please assign a team to this vehicle in Truck and Team first."
+        "The selected vehicle has no linked responder team. Please assign a team to this vehicle in Truck and Team first.",
       );
       return;
     }
@@ -474,20 +513,28 @@ export default function StationsPage() {
       const batch = writeBatch(db);
 
       stations.forEach((station) => {
-        const nextTeamIds = (station.teamIds || []).filter((id) => id !== targetTeam.id);
-        const nextTeamNames = (station.teamNames || []).filter(
-          (name) => name !== targetTeam.teamName
+        const nextTeamIds = (station.teamIds || []).filter(
+          (id) => id !== targetTeam.id,
         );
-        const nextVehicleIds = (station.vehicleIds || []).filter((id) => id !== targetVehicle.id);
+        const nextTeamNames = (station.teamNames || []).filter(
+          (name) => name !== targetTeam.teamName,
+        );
+        const nextVehicleIds = (station.vehicleIds || []).filter(
+          (id) => id !== targetVehicle.id,
+        );
         const nextVehicleCodes = (station.vehicleCodes || []).filter(
-          (code) => code !== targetVehicle.code
+          (code) => code !== targetVehicle.code,
         );
 
         if (station.id === targetStation.id) {
-          if (!nextTeamIds.includes(targetTeam.id)) nextTeamIds.push(targetTeam.id);
-          if (!nextTeamNames.includes(targetTeam.teamName)) nextTeamNames.push(targetTeam.teamName);
-          if (!nextVehicleIds.includes(targetVehicle.id)) nextVehicleIds.push(targetVehicle.id);
-          if (!nextVehicleCodes.includes(targetVehicle.code)) nextVehicleCodes.push(targetVehicle.code);
+          if (!nextTeamIds.includes(targetTeam.id))
+            nextTeamIds.push(targetTeam.id);
+          if (!nextTeamNames.includes(targetTeam.teamName))
+            nextTeamNames.push(targetTeam.teamName);
+          if (!nextVehicleIds.includes(targetVehicle.id))
+            nextVehicleIds.push(targetVehicle.id);
+          if (!nextVehicleCodes.includes(targetVehicle.code))
+            nextVehicleCodes.push(targetVehicle.code);
         }
 
         batch.update(doc(db, "stations", station.id), {
@@ -509,19 +556,31 @@ export default function StationsPage() {
       });
 
       const responderDocsById = targetTeam.id
-        ? await getDocs(query(collection(db, "users"), where("teamId", "==", targetTeam.id)))
+        ? await getDocs(
+            query(
+              collection(db, "users"),
+              where("teamId", "==", targetTeam.id),
+            ),
+          )
         : null;
 
       const responderDocsByName = targetTeam.teamName
         ? await getDocs(
-            query(collection(db, "users"), where("teamName", "==", targetTeam.teamName))
+            query(
+              collection(db, "users"),
+              where("teamName", "==", targetTeam.teamName),
+            ),
           )
         : null;
 
       const uniqueResponderIds = new Set<string>();
 
-      responderDocsById?.docs.forEach((userDoc) => uniqueResponderIds.add(userDoc.id));
-      responderDocsByName?.docs.forEach((userDoc) => uniqueResponderIds.add(userDoc.id));
+      responderDocsById?.docs.forEach((userDoc) =>
+        uniqueResponderIds.add(userDoc.id),
+      );
+      responderDocsByName?.docs.forEach((userDoc) =>
+        uniqueResponderIds.add(userDoc.id),
+      );
 
       uniqueResponderIds.forEach((userId) => {
         batch.update(doc(db, "users", userId), {
@@ -534,24 +593,20 @@ export default function StationsPage() {
       });
 
       await batch.commit();
-      setSuccessMessage("Vehicle and linked team assigned to station successfully.");
+      setSuccessMessage(
+        "Vehicle and linked team assigned to station successfully.",
+      );
     } catch (err) {
       console.error(err);
       setErrorMessage("Failed to assign vehicle to station.");
     }
   };
 
-
-  const [stationToDelete, setStationToDelete] = useState<StationRecord | null>(null);
   const confirmDeleteStation = async () => {
-  if (!stationToDelete) {
-    return;
-  }
-
-  await deleteStation(stationToDelete);
-  setStationToDelete(null);
-};
-
+    if (!stationToDelete) return;
+    await deleteStation(stationToDelete);
+    setStationToDelete(null);
+  };
 
   return (
     <div className={styles.pageWrapper}>
@@ -567,8 +622,11 @@ export default function StationsPage() {
         <div className={styles.contentSection}>
           <div className={styles.headerRow}>
             <h2 className={styles.pageTitle}>Stations</h2>
-            <button className={styles.addBtn} onClick={() => setShowAddStationModal(true)}>
-              Add Station
+            <button
+              className={styles.addBtn}
+              onClick={() => setShowAddStationModal(true)}
+            >
+              <span>Add Station</span>
             </button>
           </div>
 
@@ -576,6 +634,7 @@ export default function StationsPage() {
 
           <div className={styles.assignCard}>
             <h3 className={styles.assignTitle}>Assign Vehicle to Station</h3>
+
             <div className={styles.assignGrid}>
               <select
                 className={styles.input}
@@ -607,18 +666,21 @@ export default function StationsPage() {
 
             {availableVehicles.length === 0 && (
               <p className={styles.helpText}>
-                All vehicles are currently assigned to stations. Edit a station to remove
-                assignments before adding another.
+                All vehicles are currently assigned to stations. Edit a station
+                to remove assignments before adding another.
               </p>
             )}
 
             <p className={styles.helpText}>
-              Team assignment is inferred from the selected vehicle. Make sure the vehicle has
-              an assigned team in Truck and Team.
+              Team assignment is inferred from the selected vehicle. Make sure
+              the vehicle has an assigned team in Truck and Team.
             </p>
 
-            <button className={styles.assignBtn} onClick={assignVehicleToStation}>
-              Save Assignment
+            <button
+              className={styles.assignBtn}
+              onClick={assignVehicleToStation}
+            >
+              <span>Save Assignment</span>
             </button>
           </div>
 
@@ -645,7 +707,11 @@ export default function StationsPage() {
                     <tr key={station.id}>
                       <td>{station.name}</td>
                       <td>{station.address || "-"}</td>
-                      <td>{(station.teamNames || []).length ? station.teamNames?.join(", ") : "-"}</td>
+                      <td>
+                        {(station.teamNames || []).length
+                          ? station.teamNames?.join(", ")
+                          : "-"}
+                      </td>
                       <td>
                         {(station.vehicleCodes || []).length
                           ? station.vehicleCodes?.join(", ")
@@ -657,14 +723,15 @@ export default function StationsPage() {
                             className={styles.editBtn}
                             onClick={() => openEditStation(station)}
                           >
-                            Edit
+                            <span>Edit</span>
                           </button>
+
                           <button
-  className={styles.deleteBtn}
-  onClick={() => setStationToDelete(station)}
->
-  Delete
-</button>
+                            className={styles.deleteBtn}
+                            onClick={() => setStationToDelete(station)}
+                          >
+                            <span>Delete</span>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -677,9 +744,16 @@ export default function StationsPage() {
       </div>
 
       {showAddStationModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowAddStationModal(false)}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setShowAddStationModal(false)}
+        >
+          <div
+            className={`${styles.modalContent} ${styles.addStationModal}`}
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className={styles.modalTitle}>Add Station</h3>
+
             <label className={styles.label}>Station Name</label>
             <input
               className={styles.input}
@@ -702,33 +776,42 @@ export default function StationsPage() {
                 onClick={searchAddressOnMap}
                 disabled={isResolvingAddress}
               >
-                {isResolvingAddress ? "Searching..." : "Find on Map"}
+                <span>
+                  {isResolvingAddress ? "Searching..." : "Find on Map"}
+                </span>
               </button>
             </div>
 
             <label className={styles.label}>Pin Station on Map</label>
             <div className={styles.mapWrap}>
-              <StationMapPicker value={stationCoordinates} onPick={handleMapPick} />
+              <StationMapPicker
+                value={stationCoordinates}
+                onPick={handleMapPick}
+              />
             </div>
 
             <p className={styles.helpText}>
-              Click the map to pin the station. If address lookup does not fill automatically,
-              keep the pin and type or edit the address manually.
+              Click the map to pin the station. If address lookup does not fill
+              automatically, keep the pin and type or edit the address manually.
             </p>
 
             {stationCoordinates && (
               <p className={styles.coordinateText}>
-                Selected coordinates: {stationCoordinates.lat.toFixed(6)}, {" "}
+                Selected coordinates: {stationCoordinates.lat.toFixed(6)},{" "}
                 {stationCoordinates.lng.toFixed(6)}
               </p>
             )}
 
             <div className={styles.modalActions}>
-              <button className={styles.closeBtn} onClick={() => setShowAddStationModal(false)}>
-                Close
+              <button
+                className={styles.closeBtn}
+                onClick={() => setShowAddStationModal(false)}
+              >
+                <span>Close</span>
               </button>
+
               <button className={styles.saveBtn} onClick={createStation}>
-                Save
+                <span>Save</span>
               </button>
             </div>
           </div>
@@ -737,8 +820,12 @@ export default function StationsPage() {
 
       {editingStation && (
         <div className={styles.modalOverlay} onClick={closeEditStation}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className={styles.modalTitle}>Edit Station</h3>
+
             <label className={styles.label}>Station Name</label>
             <input
               className={styles.input}
@@ -758,10 +845,14 @@ export default function StationsPage() {
             <label className={styles.label}>Assigned Vehicles</label>
             <div className={styles.assignedList}>
               {editingStationVehicleIds.length === 0 ? (
-                <p className={styles.helpText}>No assigned vehicles in this station.</p>
+                <p className={styles.helpText}>
+                  No assigned vehicles in this station.
+                </p>
               ) : (
                 editingStationVehicleIds.map((vehicleId) => {
-                  const vehicle = vehicles.find((item) => item.id === vehicleId);
+                  const vehicle = vehicles.find(
+                    (item) => item.id === vehicleId,
+                  );
                   const label = vehicle
                     ? `${vehicle.code} ${vehicle.plate ? `(${vehicle.plate})` : ""}`
                     : vehicleId;
@@ -774,7 +865,7 @@ export default function StationsPage() {
                         type="button"
                         onClick={() => removeVehicleFromStation(vehicleId)}
                       >
-                        Remove
+                        <span>Remove</span>
                       </button>
                     </div>
                   );
@@ -783,15 +874,17 @@ export default function StationsPage() {
             </div>
 
             <p className={styles.helpText}>
-              Removing a vehicle also removes its linked team and responders from this station.
+              Removing a vehicle also removes its linked team and responders
+              from this station.
             </p>
 
             <div className={styles.modalActions}>
               <button className={styles.closeBtn} onClick={closeEditStation}>
-                Close
+                <span>Close</span>
               </button>
+
               <button className={styles.saveBtn} onClick={saveEditedStation}>
-                Save Changes
+                <span>Save Changes</span>
               </button>
             </div>
           </div>
@@ -799,47 +892,92 @@ export default function StationsPage() {
       )}
 
       {successMessage && (
-        <div className={styles.feedbackSuccess} onAnimationEnd={() => setSuccessMessage(null)}>
-          {successMessage}
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setSuccessMessage(null)}
+        >
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className={styles.modalTitle}>Success</h3>
+            <p className={styles.statusMessage}>{successMessage}</p>
+
+            <div className={styles.okayBtnWrapper}>
+              <button
+                className={styles.okayBtn}
+                onClick={() => setSuccessMessage(null)}
+              >
+                <span>Okay</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {errorMessage && (
-        <div className={styles.feedbackError} onAnimationEnd={() => setErrorMessage(null)}>
-          {errorMessage}
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setErrorMessage(null)}
+        >
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className={styles.modalTitle}>Error</h3>
+            <p className={styles.statusMessage}>{errorMessage}</p>
+
+            <div className={styles.okayBtnWrapper}>
+              <button
+                className={styles.okayBtn}
+                onClick={() => setErrorMessage(null)}
+              >
+                <span>Okay</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {stationToDelete && (
-  <div className={styles.modalOverlay} onClick={() => setStationToDelete(null)}>
-    <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-      <h3 className={styles.modalTitle}>Confirm Delete</h3>
-
-      <p className={styles.helpText}>
-        Are you sure you want to delete <strong>{stationToDelete.name}</strong>?
-      </p>
-
-      <p className={styles.helpText}>
-        This will also unassign linked teams, vehicles, and responders from this station.
-      </p>
-
-      <div className={styles.modalActions}>
-        <button
-          className={styles.closeBtn}
+        <div
+          className={styles.modalOverlay}
           onClick={() => setStationToDelete(null)}
         >
-          Cancel
-        </button>
-        <button
-          className={styles.deleteBtn}
-          onClick={confirmDeleteStation}
-        >
-          Delete
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className={styles.modalTitle}>Confirm Delete</h3>
+
+            <p className={styles.statusMessage}>
+              Are you sure you want to delete{" "}
+              <strong>{stationToDelete.name}</strong>?
+            </p>
+
+            <p className={styles.statusMessage}>
+              This will also unassign linked teams, vehicles, and responders
+              from this station.
+            </p>
+
+            <div className={styles.modalActions}>
+              <button
+                className={styles.closeBtn}
+                onClick={() => setStationToDelete(null)}
+              >
+                <span>Cancel</span>
+              </button>
+
+              <button
+                className={styles.deleteBtn}
+                onClick={confirmDeleteStation}
+              >
+                <span>Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

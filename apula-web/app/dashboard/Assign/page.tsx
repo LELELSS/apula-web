@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Lottie from "lottie-react";
 import fireAnimation from "@/public/lottie/fire.json";
 import AdminHeader from "@/components/shared/adminHeader";
 import styles from "./tv.module.css";
 import { FaSearch } from "react-icons/fa";
-
 import {
   collection,
   query,
@@ -15,7 +14,6 @@ import {
   doc,
   writeBatch,
 } from "firebase/firestore";
-
 import { db } from "@/lib/firebase";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
@@ -25,29 +23,27 @@ export default function AssignPage() {
   const [responders, setResponders] = useState<any[]>([]);
   const [teamList, setTeamList] = useState<any[]>([]);
   const [vehicleList, setVehicleList] = useState<any[]>([]);
-
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [selectedResponderIds, setSelectedResponderIds] = useState<Set<string>>(
-    new Set()
-  );
-  const [selectAll, setSelectAll] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-
-  const [teamAssignments, setTeamAssignments] = useState<Record<string, string>>(
-    {}
-  );
-
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ---------------- LOAD DATA ----------------
+  const [isAssignMode, setIsAssignMode] = useState(false);
+  const [teamAssignments, setTeamAssignments] = useState<
+    Record<string, string>
+  >({});
+
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   useEffect(() => {
     const unsubUsers = onSnapshot(
-      query(collection(db, "users"), where("role", "==", "responder")),
+      query(
+        collection(db, "users"),
+        where("role", "==", "responder"),
+        where("approved", "==", true),
+      ),
       (snap) => {
         setResponders(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
         setLoading(false);
-      }
+      },
     );
 
     const unsubTeams = onSnapshot(collection(db, "teams"), (snap) => {
@@ -67,10 +63,34 @@ export default function AssignPage() {
     };
   }, []);
 
-  // ---------------- HELPERS ----------------
-  const filteredResponders = responders.filter((r) =>
-    (r.name || "").toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredResponders = useMemo(() => {
+    const filtered = responders.filter((r) =>
+      (r.name || "").toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+
+    return [...filtered].sort((a, b) => {
+      const aLeader = teamList.some((t) => t.leaderId === a.id);
+      const bLeader = teamList.some((t) => t.leaderId === b.id);
+
+      const aUnassigned =
+        !String(a.teamId || "").trim() || !String(a.teamName || "").trim();
+      const bUnassigned =
+        !String(b.teamId || "").trim() || !String(b.teamName || "").trim();
+
+      // 1. Unassigned first
+      if (aUnassigned && !bUnassigned) return -1;
+      if (!aUnassigned && bUnassigned) return 1;
+
+      // 2. Leaders below unassigned
+      if (!aUnassigned && !bUnassigned) {
+        if (aLeader && !bLeader) return -1;
+        if (!aLeader && bLeader) return 1;
+      }
+
+      // 3. Normal alphabetical order
+      return (a.name || "").localeCompare(b.name || "");
+    });
+  }, [responders, searchTerm, teamList]);
 
   const getLeaderTeam = (responderId: string) =>
     teamList.find((t) => t.leaderId === responderId);
@@ -102,134 +122,116 @@ export default function AssignPage() {
     );
   };
 
-  const toggleResponder = (id: string) => {
-    if (isLeader(id)) return;
-
-    setSelectedResponderIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    if (!selectAll) {
-      const nonLeaders = responders
-        .filter((r) => !isLeader(r.id))
-        .map((r) => r.id);
-
-      setSelectedResponderIds(new Set(nonLeaders));
-      setSelectAll(true);
-    } else {
-      setSelectedResponderIds(new Set());
-      setSelectAll(false);
-    }
-  };
-
-  const updateTeam = (responderId: string, teamId: string) => {
-    if (isLeader(responderId)) return;
-    setTeamAssignments((prev) => ({ ...prev, [responderId]: teamId }));
-  };
-
-  const closeAssignModal = () => {
-    setShowAssignModal(false);
-  };
-
-  // ---------------- SAVE ASSIGNMENTS ----------------
-  const saveAssignments = async () => {
-    if (selectedResponderIds.size === 0) {
-      setErrorMessage("Please select at least one responder.");
+  const handleToggleAssignMode = () => {
+    if (isAssignMode) {
+      setIsAssignMode(false);
+      setTeamAssignments({});
       return;
     }
 
-    const selected = responders.filter(
-      (r) => selectedResponderIds.has(r.id) && !isLeader(r.id)
-    );
+    const initialAssignments: Record<string, string> = {};
+    responders.forEach((r) => {
+      const assignedTeam = getAssignedTeam(r);
+      initialAssignments[r.id] = assignedTeam?.id || r.teamId || "";
+    });
 
-    if (selected.length === 0) {
-      setErrorMessage("No valid responders selected.");
+    setTeamAssignments(initialAssignments);
+    setIsAssignMode(true);
+  };
+
+  const handleTeamChange = (responderId: string, teamId: string) => {
+    setTeamAssignments((prev) => ({
+      ...prev,
+      [responderId]: teamId,
+    }));
+  };
+
+  const hasChanges = useMemo(() => {
+    return filteredResponders.some((r) => {
+      if (isLeader(r.id)) return false;
+      const currentTeamId = getAssignedTeam(r)?.id || r.teamId || "";
+      const nextTeamId = teamAssignments[r.id] ?? currentTeamId;
+      return currentTeamId !== nextTeamId;
+    });
+  }, [filteredResponders, teamAssignments, teamList, vehicleList]);
+
+  const saveAssignments = async () => {
+    const changedResponders = filteredResponders.filter((r) => {
+      if (isLeader(r.id)) return false;
+      const currentTeamId = getAssignedTeam(r)?.id || r.teamId || "";
+      const nextTeamId = teamAssignments[r.id] ?? currentTeamId;
+      return currentTeamId !== nextTeamId;
+    });
+
+    if (changedResponders.length === 0) {
+      setErrorMessage("No changes were made.");
       return;
     }
 
     const teamMembersMap: Record<string, any[]> = {};
-    const changedTeamIds = new Set<string>();
-
     teamList.forEach((t) => {
       teamMembersMap[t.id] = (t.members || []).map((m: any) => ({ ...m }));
-    });
-
-    const userUpdates: Record<string, any> = {};
-
-    selected.forEach((r) => {
-      const oldTeamId: string = r.teamId || "";
-      const newTeamId: string = teamAssignments[r.id] ?? r.teamId ?? "";
-
-      const oldTeam = oldTeamId
-        ? teamList.find((t) => t.id === oldTeamId)
-        : null;
-
-      const newTeam = newTeamId
-        ? teamList.find((t) => t.id === newTeamId)
-        : null;
-
-      if (oldTeam && teamMembersMap[oldTeam.id]) {
-        teamMembersMap[oldTeam.id] = teamMembersMap[oldTeam.id].filter(
-          (m) => m.id !== r.id
-        );
-        changedTeamIds.add(oldTeam.id);
-      }
-
-      if (newTeam) {
-        const list = teamMembersMap[newTeam.id] || [];
-        if (!list.some((m: any) => m.id === r.id)) {
-          list.push({
-            id: r.id,
-            name: r.name,
-            status: r.status || "Available",
-            teamName: newTeam.teamName,
-          });
-        }
-        teamMembersMap[newTeam.id] = list;
-        changedTeamIds.add(newTeam.id);
-      }
-
-      const vehicle = newTeam
-        ? vehicleList.find((v) => v.assignedTeamId === newTeam.id)
-        : null;
-
-      userUpdates[r.id] = {
-        teamId: newTeam?.id || "",
-        teamName: newTeam?.teamName || "",
-        vehicleId: vehicle?.id || "",
-        vehicleCode: vehicle?.code || "",
-        vehiclePlate: vehicle?.plate || "",
-      };
     });
 
     try {
       const batch = writeBatch(db);
 
-      changedTeamIds.forEach((teamId) => {
-        const members = teamMembersMap[teamId] || [];
-        batch.update(doc(db, "teams", teamId), { members });
-      });
+      for (const responder of changedResponders) {
+        const oldTeamId =
+          getAssignedTeam(responder)?.id || responder.teamId || "";
+        const newTeamId = teamAssignments[responder.id] || "";
 
-      Object.entries(userUpdates).forEach(([userId, fields]) => {
-        batch.update(doc(db, "users", userId), fields);
+        const newTeam = newTeamId
+          ? teamList.find((t) => t.id === newTeamId)
+          : null;
+
+        if (oldTeamId && teamMembersMap[oldTeamId]) {
+          teamMembersMap[oldTeamId] = teamMembersMap[oldTeamId].filter(
+            (m) => m.id !== responder.id,
+          );
+        }
+
+        if (newTeam) {
+          const list = teamMembersMap[newTeam.id] || [];
+          if (!list.some((m: any) => m.id === responder.id)) {
+            list.push({
+              id: responder.id,
+              name: responder.name,
+              status: responder.status || "Available",
+              teamName: newTeam.teamName,
+            });
+          }
+          teamMembersMap[newTeam.id] = list;
+        }
+
+        const vehicle = newTeam
+          ? vehicleList.find((v) => v.assignedTeamId === newTeam.id)
+          : null;
+
+        batch.update(doc(db, "users", responder.id), {
+          teamId: newTeam?.id || "",
+          teamName: newTeam?.teamName || "",
+          vehicleId: vehicle?.id || "",
+          vehicleCode: vehicle?.code || "",
+          vehiclePlate: vehicle?.plate || "",
+        });
+      }
+
+      Object.entries(teamMembersMap).forEach(([teamId, members]) => {
+        batch.update(doc(db, "teams", teamId), { members });
       });
 
       await batch.commit();
 
-      setShowAssignModal(false);
+      setIsAssignMode(false);
+      setTeamAssignments({});
       setShowSuccessModal(true);
-      setTimeout(() => setShowSuccessModal(false), 2000);
     } catch (error) {
       console.error("Error saving assignments:", error);
       setErrorMessage("Failed to save assignments.");
     }
   };
 
-  // ---------------- UI ----------------
   return (
     <div className={styles.pageWrapper}>
       {loading ? (
@@ -246,12 +248,9 @@ export default function AssignPage() {
         >
           <Lottie
             animationData={fireAnimation}
-            loop={true}
-            autoplay={true}
-            style={{
-              width: 160,
-              height: 160,
-            }}
+            loop
+            autoplay
+            style={{ width: 160, height: 160 }}
           />
         </div>
       ) : (
@@ -268,112 +267,95 @@ export default function AssignPage() {
             <div className={styles.contentSection}>
               <h2 className={styles.pageTitle}>Assign Member</h2>
 
-          <div className={styles.searchWrapper}>
-            <div className={styles.searchBox}>
-              <FaSearch className={styles.searchIcon} />
-              <input
-                className={styles.searchInput}
-                placeholder="Search responders..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+              <hr className={styles.separator} />
 
-            <button
-              className={styles.assignBtn}
-              onClick={() => setShowAssignModal(true)}
-            >
-              <span>Assign Member</span>
-            </button>
-          </div>
-
-          <table className={styles.userTable}>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Team</th>
-                <th>Truck</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredResponders.map((r) => {
-                const leaderTeam = getLeaderTeam(r.id);
-                const assignedTeam = getAssignedTeam(r);
-                const assignedVehicle = getAssignedVehicle(r, assignedTeam);
-
-                return (
-                  <tr key={r.id}>
-                    <td>
-                      {r.name}
-                      {leaderTeam && (
-                        <span style={{ color: "#c0392b", marginLeft: 8 }}>
-                          (Leader)
-                        </span>
-                      )}
-                    </td>
-                    <td>{assignedTeam?.teamName || "Unassigned"}</td>
-                    <td>{assignedVehicle?.code || "Unassigned"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ASSIGN MODAL */}
-      {showAssignModal && (
-        <div className={styles.modalOverlay} onClick={closeAssignModal}>
-          <div
-            className={styles.modalWide}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Assign Team</h3>
-            </div>
-
-            <div className={styles.modalBody}>
-              <div className={styles.selectAllRow}>
-                <label>
+              <div className={styles.searchWrapper}>
+                <div className={styles.searchBox}>
+                  <FaSearch className={styles.searchIcon} />
                   <input
-                    type="checkbox"
-                    checked={selectAll}
-                    onChange={toggleSelectAll}
-                  />{" "}
-                  Select All
-                </label>
+                    className={styles.searchInput}
+                    placeholder="Search responders..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <button
+                    className={styles.assignBtn}
+                    onClick={handleToggleAssignMode}
+                  >
+                    <span>{isAssignMode ? "Cancel" : "Assign Member"}</span>
+                  </button>
+
+                  {isAssignMode && (
+                    <button
+                      className={styles.saveBtn}
+                      onClick={saveAssignments}
+                    >
+                      <span>Save</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className={styles.tableScroll}>
-                <table className={styles.responderTable}>
-                  <thead>
-                    <tr>
-                      <th>Select</th>
-                      <th>Name</th>
-                      <th>Team</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {responders.map((r) => {
-                      const leader = isLeader(r.id);
-                      return (
-                        <tr key={r.id} style={{ opacity: leader ? 0.5 : 1 }}>
-                          <td>
-                            <input
-                              type="checkbox"
-                              disabled={leader}
-                              checked={selectedResponderIds.has(r.id)}
-                              onChange={() => toggleResponder(r.id)}
-                            />
-                          </td>
-                          <td>
-                            {r.name} {leader && "(Leader)"}
-                          </td>
-                          <td>
+              <table className={styles.userTable}>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Team</th>
+                    <th>Truck</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredResponders.map((r) => {
+                    const leaderTeam = getLeaderTeam(r.id);
+                    const assignedTeam = getAssignedTeam(r);
+                    const assignedVehicle = getAssignedVehicle(r, assignedTeam);
+                    const selectedTeamId =
+                      teamAssignments[r.id] ??
+                      assignedTeam?.id ??
+                      r.teamId ??
+                      "";
+
+                    const isUnassigned =
+                      !String(r.teamId || "").trim() ||
+                      !String(r.teamName || "").trim();
+
+                    return (
+                      <tr
+                        key={r.id}
+                        className={isUnassigned ? styles.unassignedRow : ""}
+                      >
+                        <td data-label="Name">
+                          {r.name}
+                          {leaderTeam && (
+                            <span style={{ color: "#c0392b", marginLeft: 8 }}>
+                              (Leader)
+                            </span>
+                          )}
+                          {isUnassigned && (
+                            <span className={styles.unassignedTag}>
+                              Unassigned
+                            </span>
+                          )}
+                        </td>
+
+                        <td data-label="Team">
+                          {isAssignMode && !isLeader(r.id) ? (
                             <select
-                              disabled={leader}
-                              value={teamAssignments[r.id] ?? r.teamId ?? ""}
-                              onChange={(e) => updateTeam(r.id, e.target.value)}
+                              className={styles.inlineSelect}
+                              value={selectedTeamId}
+                              onChange={(e) =>
+                                handleTeamChange(r.id, e.target.value)
+                              }
                             >
                               <option value="">Unassigned</option>
                               {teamList.map((t) => (
@@ -382,65 +364,81 @@ export default function AssignPage() {
                                 </option>
                               ))}
                             </select>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          ) : (
+                            assignedTeam?.teamName || "Unassigned"
+                          )}
+                        </td>
+
+                        <td data-label="Truck">
+                          {assignedVehicle?.code || "Unassigned"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {isAssignMode && !hasChanges && (
+                <p
+                  style={{
+                    marginTop: "12px",
+                    color: "#666",
+                    fontSize: "14px",
+                  }}
+                >
+                  Change a team assignment, then click Save.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {showSuccessModal && (
+            <div className={styles.modalOverlay}>
+              <div className={styles.modalContent}>
+                <div className={styles.modalHeader}>
+                  <h3 className={styles.modalTitle}>Success</h3>
+                </div>
+
+                <div className={styles.modalTextBody}>
+                  <p style={{ margin: 0 }}>Member assigned successfully.</p>
+                </div>
+
+                <div className={styles.modalFooter}>
+                  <button
+                    className={styles.closeBtn}
+                    onClick={() => setShowSuccessModal(false)}
+                  >
+                    <span>Okay</span>
+                  </button>
+                </div>
               </div>
             </div>
+          )}
 
-            <div className={styles.modalFooter}>
-              <button className={styles.closeBtn} onClick={closeAssignModal}>
-                <span>Close</span>
-              </button>
-              <button className={styles.assignBtn} onClick={saveAssignments}>
-                <span>Save</span>
-              </button>
+          {errorMessage && (
+            <div className={styles.modalOverlay}>
+              <div className={styles.modalContent}>
+                <div className={styles.modalHeader}>
+                  <h3 className={styles.modalTitle}>Notice</h3>
+                </div>
+
+                <div className={styles.modalTextBody}>
+                  <p style={{ margin: 0 }}>{errorMessage}</p>
+                </div>
+
+                <div className={styles.modalFooter}>
+                  <button
+                    className={styles.closeBtn}
+                    onClick={() => setErrorMessage(null)}
+                  >
+                    <span>Okay</span>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
-
-      {/* SUCCESS MODAL */}
-      {showSuccessModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.successModal}>
-            <div className={styles.successIcon}>✔</div>
-            <h3 className={styles.successTitle}>Member Assigned Successfully!</h3>
-          </div>
-        </div>
-      )}
-
-      {/* NOTICE MODAL */}
-      {errorMessage && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Notice</h3>
-            </div>
-
-            <div className={styles.modalBody}>
-              <p style={{ margin: 0, textAlign: "center", color: "black" }}>
-                {errorMessage}
-              </p>
-            </div>
-
-            <div className={styles.modalFooter}>
-              <button
-                className={styles.closeBtn}
-                onClick={() => setErrorMessage(null)}
-              >
-                <span>Okay</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
-  )}
-</div>
   );
 }

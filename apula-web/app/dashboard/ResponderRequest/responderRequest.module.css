@@ -131,34 +131,55 @@
   font-style: italic;
 }
 
-
-
 /* BUTTONS */
 .acceptBtn,
 .declineBtn,
 .cancelBtn {
   position: relative;
-  padding: 0.55rem 0.95rem;
-  border-radius: 10px;
+  padding: 6px 12px;
+  border-radius: 8px;
   cursor: pointer;
   overflow: hidden;
   background: #ffffff;
-  border: 2px solid #a30000;
-  color: #a30000;
-  font-weight: 700;
-  transition: color 0.25s ease;
+  color: black;
+  font-weight: bold;
+  margin-right: 6px;
+  transition:
+    color 0.25s ease,
+    border-color 0.25s ease;
 }
 
+/* default borders */
+.acceptBtn {
+  border: 2px solid #198754;
+}
+
+.declineBtn,
+.cancelBtn {
+  border: 2px solid #a30000;
+}
+
+/* hover fill */
 .acceptBtn::before,
 .declineBtn::before,
 .cancelBtn::before {
   content: "";
   position: absolute;
-  inset: 0;
+  top: 0;
   left: -100%;
-  background: #a30000;
+  width: 100%;
+  height: 100%;
   transition: left 0.35s ease;
   z-index: 0;
+}
+
+.acceptBtn::before {
+  background: #198754;
+}
+
+.declineBtn::before,
+.cancelBtn::before {
+  background: #a30000;
 }
 
 .acceptBtn:hover::before,
@@ -195,7 +216,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 2000;
   padding: 16px;
   animation: fadeIn 0.3s ease;
 }
@@ -247,6 +268,36 @@
 .confirmButtons .declineBtn,
 .confirmButtons .cancelBtn {
   flex: 1;
+}
+
+.modalTitle {
+  color: #a30000;
+  font-weight: 700;
+  font-size: 20px;
+  text-align: center;
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.confirmText {
+  margin: 10px 0 20px;
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.singleButtonWrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.singleButtonWrap .acceptBtn,
+.singleButtonWrap .cancelBtn {
+  min-width: 130px;
+  margin-right: 0;
 }
 
 /* ANIMATIONS */
@@ -320,7 +371,7 @@
     min-width: 80px;
   }
 
-  .noResults{
+  .noResults {
     padding: 24px;
     text-align: center;
   }

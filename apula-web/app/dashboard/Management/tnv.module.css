@@ -12,7 +12,7 @@
   background: #fff;
   padding: 20px;
   border-radius: 12px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .pageTitle {
@@ -78,17 +78,37 @@
 }
 
 .addBtn {
+  position: relative;
+  overflow: hidden;
   background: #8b0000;
   color: white;
   padding: 8px 14px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
+  z-index: 1;
+  transition: box-shadow 0.25s ease;
+}
+
+.addBtn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: #5e0000;
+  transition: left 0.3s ease;
+  z-index: -1;
+}
+
+.addBtn:hover::before {
+  left: 0;
 }
 
 .addBtn:hover {
-  background: #5e0000;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
 }
 
 /* ============================= */
@@ -145,7 +165,7 @@
 
 .actionBtn {
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   border: none;
   font-weight: 600;
@@ -175,28 +195,43 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.45);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 9999;
-  padding: 10px;
+  padding: 16px;
 }
 
 .modalContent {
   background: white;
-  width: 420px;
-  padding: 25px;
-  border-radius: 14px;
+  width: 100%;
+  max-width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 26px;
+  border-radius: 16px;
   animation: fadeInScale 0.25s ease;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+  color: black;
 }
 
 .modalTitle {
-  font-size: 1.3rem;
+  font-size: 1.45rem;
   font-weight: 700;
-  color: #800000;
-  margin-bottom: 15px;
+  color: #a30000;
+  margin-bottom: 16px;
+  text-align: center;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #a30000;
+}
+
+.modalText {
+  margin: 8px 0 4px;
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.5;
   text-align: center;
 }
 
@@ -205,58 +240,172 @@
 /* ============================= */
 
 .label {
-  font-weight: 600;
-  margin-bottom: 6px;
   display: block;
-  color: #444;
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  margin-top: 12px;
+  margin-bottom: 8px;
 }
 
 .input {
-  width: 90%;
-  padding: 10px 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
   margin-bottom: 12px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  font-size: 0.95rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #111827;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input:focus {
+  border-color: #a30000;
+  box-shadow: 0 0 0 3px rgba(163, 0, 0, 0.1);
 }
 
 .modalActions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 10px;
+  margin-top: 20px;
+  flex-wrap: wrap;
 }
 
-.saveBtn {
-  background: #28a745;
-  color: white;
-  padding: 10px 14px;
-  border: none;
-  border-radius: 6px;
+/* ============================= */
+/*     MODAL BUTTON EFFECTS      */
+/* ============================= */
+
+.saveBtn,
+.closeBtn,
+.deleteConfirmBtn {
+  position: relative;
+  overflow: hidden;
+  padding: 12px 18px;
+  border-radius: 10px;
   cursor: pointer;
-  font-weight: bold;
+  font-weight: 600;
+  min-width: 130px;
+  z-index: 1;
+  transition: color 0.25s ease, border-color 0.25s ease,
+    box-shadow 0.25s ease, background-color 0.25s ease;
+}
+
+.saveBtn::before,
+.closeBtn::before,
+.deleteConfirmBtn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  transition: left 0.3s ease;
+  z-index: -1;
+}
+
+/* SAVE */
+.saveBtn {
+  background: #a30000;
+  color: white;
+  border: 2px solid #a30000;
+}
+
+.saveBtn::before {
+  background: #7f0000;
+}
+
+.saveBtn:hover::before {
+  left: 0;
 }
 
 .saveBtn:hover {
-  background: #1f7e33;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
 }
 
+/* CLOSE */
 .closeBtn {
-  background: #555;
-  color: white;
-  padding: 10px 14px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
+  background: white;
+  color: #a30000;
+  border: 2px solid #a30000;
+}
+
+.closeBtn::before {
+  background: #a30000;
 }
 
 .closeBtn:hover {
-  background: #333;
+  color: white;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+}
+
+.closeBtn:hover::before {
+  left: 0;
+}
+
+/* DELETE CONFIRM */
+.deleteConfirmBtn {
+  background: #dc2626;
+  color: white;
+  border: 2px solid #dc2626;
+}
+
+.deleteConfirmBtn::before {
+  background: #b91c1c;
+}
+
+.deleteConfirmBtn:hover::before {
+  left: 0;
+}
+
+.deleteConfirmBtn:hover {
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
 }
 
 /* ============================= */
-/* SUCCESS MODAL                 */
+/*      SUCCESS / ERROR MODAL    */
 /* ============================= */
 
+.statusModal {
+  text-align: center;
+}
+
+.statusIcon {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.successIcon {
+  background: #ecfdf3;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.errorIcon {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.statusMessage {
+  margin: 8px 0 4px;
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* Optional old success classes kept safe */
 .successModal {
   background: white;
   width: 380px;
@@ -264,14 +413,7 @@
   border-radius: 14px;
   text-align: center;
   animation: fadeInScale 0.25s ease;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.25);
-}
-
-.successIcon {
-  font-size: 48px;
-  color: #28a745;
-  margin-bottom: 10px;
-  font-weight: bold;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
 }
 
 .successTitle {
@@ -295,6 +437,51 @@
   background: #1e7e34;
 }
 
+.okayBtnWrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 22px;
+}
+
+.okayBtn {
+  background: #c00000;
+  color: white;
+  border: 2px solid #c00000;
+  padding: 12px 28px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+  min-width: 190px;
+  position: relative;
+  overflow: hidden;
+  transition: color 0.3s ease;
+}
+
+.okayBtn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: white;
+  transition: left 0.35s ease;
+  z-index: 0;
+}
+
+.okayBtn span {
+  position: relative;
+  z-index: 1;
+}
+
+.okayBtn:hover::before {
+  left: 0;
+}
+
+.okayBtn:hover {
+  color: #c00000;
+}
+
 /* ============================= */
 /* ANIMATIONS                    */
 /* ============================= */
@@ -307,5 +494,51 @@
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+/* ============================= */
+/* RESPONSIVE                    */
+/* ============================= */
+
+@media (max-width: 600px) {
+  .container {
+    padding: 14px;
+  }
+
+  .contentSection {
+    padding: 14px;
+  }
+
+  .headerRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .tabContainer {
+    flex-wrap: wrap;
+  }
+
+  .modalOverlay {
+    padding: 12px;
+  }
+
+  .modalContent {
+    max-width: 100%;
+    width: 100%;
+    max-height: 92vh;
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  .modalActions {
+    flex-direction: column;
+  }
+
+  .saveBtn,
+  .closeBtn,
+  .deleteConfirmBtn {
+    width: 100%;
   }
 }

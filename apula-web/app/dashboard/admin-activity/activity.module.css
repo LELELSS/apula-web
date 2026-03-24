@@ -156,3 +156,30 @@
   color: #111;
   vertical-align: top;
 }
+
+/* PAGINATION */
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.pageBtn {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: none;
+  background: #a30000;
+  color: white;
+  cursor: pointer;
+}
+
+.pageBtn:disabled {
+  background: #ccc;
+}
+
+.pageInfo {
+  font-weight: 600;
+}

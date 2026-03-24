@@ -32,12 +32,10 @@ type Responder = {
   uid?: string;
 };
 
-type ConfirmAction =
-  | {
-      action: "accept" | "decline";
-      responder: Responder;
-    }
-  | null;
+type ConfirmAction = {
+  action: "accept" | "decline";
+  responder: Responder;
+} | null;
 
 const ResponderRequestsPage = () => {
   const [responders, setResponders] = useState<Responder[]>([]);
@@ -57,7 +55,9 @@ const ResponderRequestsPage = () => {
       }
 
       try {
-        const userSnap = await getDocs(query(collection(db, "users"), where("email", "==", user.email)));
+        const userSnap = await getDocs(
+          query(collection(db, "users"), where("email", "==", user.email)),
+        );
         const first = userSnap.docs[0];
         const role = (first?.data()?.role || "") as string;
         setCurrentRole(role);
@@ -73,7 +73,10 @@ const ResponderRequestsPage = () => {
   }, []);
 
   useEffect(() => {
-    if (checkingRole || (currentRole !== "superadmin" && currentRole !== "admin")) {
+    if (
+      checkingRole ||
+      (currentRole !== "superadmin" && currentRole !== "admin")
+    ) {
       return;
     }
 
@@ -81,7 +84,9 @@ const ResponderRequestsPage = () => {
       try {
         const querySnapshot = await getDocs(collection(db, "users"));
         const list: Responder[] = querySnapshot.docs
-          .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Responder))
+          .map(
+            (docSnap) => ({ id: docSnap.id, ...docSnap.data() }) as Responder,
+          )
           .filter((item) => {
             const role = String(item.role || "").toLowerCase();
             const isRequestRole =
@@ -90,7 +95,8 @@ const ResponderRequestsPage = () => {
                 : role === "responder";
             const verified = item.verified === true;
             const pendingApproval = item.approved === false;
-            const notDeclined = String(item.status || "").toLowerCase() !== "declined";
+            const notDeclined =
+              String(item.status || "").toLowerCase() !== "declined";
             return isRequestRole && verified && pendingApproval && notDeclined;
           });
 
@@ -106,7 +112,7 @@ const ResponderRequestsPage = () => {
   const filtered = responders.filter((r) =>
     `${r.name ?? ""} ${r.email ?? ""}`
       .toLowerCase()
-      .includes(searchTerm.toLowerCase())
+      .includes(searchTerm.toLowerCase()),
   );
 
   const handleAction = (action: "accept" | "decline", responder: Responder) => {
@@ -122,8 +128,13 @@ const ResponderRequestsPage = () => {
       const ref = doc(db, "users", responder.id);
 
       if (action === "accept") {
-        if (currentRole !== "superadmin" && String(responder.role || "").toLowerCase() === "admin") {
-          setErrorMessage("Only super admin can approve admin account requests.");
+        if (
+          currentRole !== "superadmin" &&
+          String(responder.role || "").toLowerCase() === "admin"
+        ) {
+          setErrorMessage(
+            "Only super admin can approve admin account requests.",
+          );
           setConfirmAction(null);
           return;
         }
@@ -133,8 +144,13 @@ const ResponderRequestsPage = () => {
           status: responder.role === "responder" ? "Available" : "Approved",
         });
       } else {
-        if (currentRole !== "superadmin" && String(responder.role || "").toLowerCase() === "admin") {
-          setErrorMessage("Only super admin can decline admin account requests.");
+        if (
+          currentRole !== "superadmin" &&
+          String(responder.role || "").toLowerCase() === "admin"
+        ) {
+          setErrorMessage(
+            "Only super admin can decline admin account requests.",
+          );
           setConfirmAction(null);
           return;
         }
@@ -152,7 +168,10 @@ const ResponderRequestsPage = () => {
           actorEmail: currentUser.email || "",
           actorName: currentUser.displayName || "",
           actorRole: currentRole,
-          action: action === "accept" ? "approve_account_request" : "decline_account_request",
+          action:
+            action === "accept"
+              ? "approve_account_request"
+              : "decline_account_request",
           targetId: responder.id,
           targetType: String(responder.role || "user"),
           details: `${action} ${responder.role || "account"} request (${responder.email || "no-email"})`,
@@ -164,7 +183,7 @@ const ResponderRequestsPage = () => {
       setSuccessMessage(
         `${responder.name ?? "Account"} has been ${
           action === "accept" ? "approved" : "declined"
-        }.`
+        }.`,
       );
     } catch (err) {
       console.error("Error updating:", err);
@@ -200,85 +219,76 @@ const ResponderRequestsPage = () => {
           </div>
         </div>
       ) : (
-
-      <div className={styles.container}>
-        <div className={styles.contentSection}>
-          <div className={styles.headerRow}>
-            <h2 className={styles.pageTitle}>Account Permission Requests</h2>
-          </div>
-
-          <hr className={styles.separator} />
-
-          <div className={styles.filters}>
-            <div className={styles.searchWrapper}>
-              <FaSearch className={styles.searchIcon} size={18} />
-              <input
-                type="text"
-                placeholder="Search responder..."
-                value={searchTerm}
-                className={styles.searchInput}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+        <div className={styles.container}>
+          <div className={styles.contentSection}>
+            <div className={styles.headerRow}>
+              <h2 className={styles.pageTitle}>Account Permission Requests</h2>
             </div>
-          </div>
 
-          <div className={styles.tableSection}>
-            <table className={styles.userTable}>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Address</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
+            <hr className={styles.separator} />
 
-              <tbody>
-                {filtered.length ? (
-                  filtered.map((r) => (
-                    <tr key={r.id}>
-                      <td data-label="Name">{r.name ?? "N/A"}</td>
-                      <td data-label="Email">{r.email ?? "N/A"}</td>
-                      <td data-label="Role">{r.role ?? "N/A"}</td>
-                      <td data-label="Address">{r.address ?? "N/A"}</td>
-                      <td data-label="Status">{r.status ?? "Pending"}</td>
-                      <td data-label="Actions" className={styles.actionCell}>
-                        <button
-                          className={styles.acceptBtn}
-                          onClick={() => handleAction("accept", r)}
-                        >
-                          <span className={styles.btnContent}>
-                            <FaUserCheck />
-                            Accept
-                          </span>
-                        </button>
+            <div className={styles.filters}>
+              <div className={styles.searchWrapper}>
+                <FaSearch className={styles.searchIcon} size={18} />
+                <input
+                  type="text"
+                  placeholder="Search responder..."
+                  value={searchTerm}
+                  className={styles.searchInput}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
 
-                        <button
-                          className={styles.declineBtn}
-                          onClick={() => handleAction("decline", r)}
-                        >
-                          <span className={styles.btnContent}>
-                            <FaUserTimes />
-                            Decline
-                          </span>
-                        </button>
+            <div className={styles.tableSection}>
+              <table className={styles.userTable}>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Address</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filtered.length ? (
+                    filtered.map((r) => (
+                      <tr key={r.id}>
+                        <td data-label="Name">{r.name ?? "N/A"}</td>
+                        <td data-label="Email">{r.email ?? "N/A"}</td>
+                        <td data-label="Role">{r.role ?? "N/A"}</td>
+                        <td data-label="Address">{r.address ?? "N/A"}</td>
+                        <td data-label="Actions" className={styles.actionCell}>
+                          <button
+                            className={styles.acceptBtn}
+                            onClick={() => handleAction("accept", r)}
+                          >
+                            <span className={styles.btnContent}>Accept</span>
+                          </button>
+
+                          <button
+                            className={styles.declineBtn}
+                            onClick={() => handleAction("decline", r)}
+                          >
+                            <span className={styles.btnContent}>Decline</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className={styles.noResults}>
+                        No pending account permission requests.
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className={styles.noResults}>
-                      No pending account permission requests.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
       )}
 
       {confirmAction && (
@@ -322,36 +332,40 @@ const ResponderRequestsPage = () => {
       )}
 
       {successMessage && (
-  <div className={styles.modalOverlay}>
-    <div className={styles.confirmModal}>
-      <h3>Success</h3>
-      <p>{successMessage}</p>
+        <div className={styles.modalOverlay}>
+          <div className={styles.confirmModal}>
+            <h3 className={styles.modalTitle}>Success</h3>
+            <p className={styles.confirmText}>{successMessage}</p>
 
-      <button
-        className={styles.acceptBtn}
-        onClick={() => setSuccessMessage(null)}
-      >
-        Okay
-      </button>
-    </div>
-  </div>
-)}
+            <div className={styles.singleButtonWrap}>
+              <button
+                className={styles.acceptBtn}
+                onClick={() => setSuccessMessage(null)}
+              >
+                <span>Okay</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-{errorMessage && (
-  <div className={styles.modalOverlay}>
-    <div className={styles.confirmModal}>
-      <h3>Error</h3>
-      <p>{errorMessage}</p>
+      {errorMessage && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.confirmModal}>
+            <h3 className={styles.modalTitle}>Error</h3>
+            <p className={styles.confirmText}>{errorMessage}</p>
 
-      <button
-        className={styles.cancelBtn}
-        onClick={() => setErrorMessage(null)}
-      >
-        Close
-      </button>
-    </div>
-  </div>
-)}
+            <div className={styles.singleButtonWrap}>
+              <button
+                className={styles.cancelBtn}
+                onClick={() => setErrorMessage(null)}
+              >
+                <span>Close</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

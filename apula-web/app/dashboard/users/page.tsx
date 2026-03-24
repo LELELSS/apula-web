@@ -28,6 +28,7 @@ type User = {
   status?: string;
   createdAt?: any;
   created_time?: string;
+  approved?: boolean;
 };
 
 export default function UsersPage() {
@@ -68,7 +69,10 @@ export default function UsersPage() {
     const fetchUsers = async () => {
       try {
         const snap = await getDocs(collection(db, "users"));
-        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as User[];
+        const list = snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        })) as User[];
         setUsers(list);
       } catch (err) {
         console.error("Error fetching users:", err);
@@ -84,9 +88,11 @@ export default function UsersPage() {
 
   const totalAll = users.length;
   const totalAdmins = users.filter(
-    (u) => norm(u.role) === "admin" || norm(u.role) === "superadmin"
+    (u) => norm(u.role) === "admin" || norm(u.role) === "superadmin",
   ).length;
-  const totalResponders = users.filter((u) => norm(u.role) === "responder").length;
+  const totalResponders = users.filter(
+    (u) => norm(u.role) === "responder",
+  ).length;
   const totalUsers = users.filter((u) => norm(u.role) === "user").length;
 
   const roleMatches = (user: User) => {
@@ -123,7 +129,10 @@ export default function UsersPage() {
 
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedUsers = filteredUsers.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  );
 
   const openModal = (user: User) => setSelectedUser(user);
   const closeModal = () => setSelectedUser(null);
@@ -132,13 +141,8 @@ export default function UsersPage() {
     const targetRole = norm(user.role);
     const actorRole = norm(currentRole);
 
-    if (actorRole === "superadmin") {
-      return true;
-    }
-
-    if (actorRole === "admin") {
-      return targetRole === "responder";
-    }
+    if (actorRole === "superadmin") return true;
+    if (actorRole === "admin") return targetRole === "responder";
 
     return false;
   };
@@ -157,6 +161,97 @@ export default function UsersPage() {
     } catch {}
 
     return String(createdAt);
+  };
+
+  const handleSave = async () => {
+    if (!editTarget) return;
+
+    try {
+      if (!canEditUser(editTarget)) {
+        alert("You are not allowed to edit this account.");
+        return;
+      }
+
+      const payload: Record<string, unknown> = {
+        name: editTarget.name?.trim() || "",
+        contact: editTarget.contact?.trim() || "",
+        status: editTarget.status,
+      };
+
+      if (norm(currentRole) === "superadmin") {
+        const nextRole = norm(editTarget.role);
+        payload.role = editTarget.role;
+
+        if (nextRole === "admin" || nextRole === "superadmin") {
+          const nextStatusRaw = norm(editTarget.status);
+          const isAllowedAdminStatus =
+            nextStatusRaw === "approved" ||
+            nextStatusRaw === "pending" ||
+            nextStatusRaw === "declined";
+
+          const nextStatus = isAllowedAdminStatus
+            ? nextStatusRaw.charAt(0).toUpperCase() + nextStatusRaw.slice(1)
+            : "Approved";
+
+          payload.status = nextStatus;
+          payload.approved = nextStatus === "Approved";
+        } else if (nextRole === "responder") {
+          payload.approved = true;
+          payload.status =
+            norm(editTarget.status) === "unavailable"
+              ? "Unavailable"
+              : "Available";
+        }
+      }
+
+      await updateDoc(doc(db, "users", editTarget.id), payload);
+
+      const currentUser = auth.currentUser;
+      if (
+        currentUser &&
+        (norm(currentRole) === "admin" || norm(currentRole) === "superadmin")
+      ) {
+        await logActivity({
+          actorUid: currentUser.uid,
+          actorEmail: currentUser.email || "",
+          actorName: currentUser.displayName || "",
+          actorRole: currentRole,
+          action: "edit_user_account",
+          targetId: editTarget.id,
+          targetType: norm(editTarget.role) || "user",
+          details: `Updated name/contact/role/status to ${
+            editTarget.name || "N/A"
+          } / ${editTarget.contact || "N/A"} / ${editTarget.role || "N/A"} / ${
+            editTarget.status || "N/A"
+          }`,
+          path: "/dashboard/users",
+        });
+      }
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === editTarget.id
+            ? {
+                ...u,
+                name: editTarget.name,
+                contact: editTarget.contact,
+                role: editTarget.role,
+                status: editTarget.status,
+              }
+            : u,
+        ),
+      );
+
+      setShowSuccess(true);
+      setEditTarget(null);
+    } catch (err) {
+      console.error("Error updating user:", err);
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Failed to update user.";
+      alert(message);
+    }
   };
 
   return (
@@ -178,52 +273,58 @@ export default function UsersPage() {
           <hr className={styles.separator} />
 
           <div className={styles.summaryRow}>
+            <div
+              className={`${styles.summaryCard} ${
+                selectedRole === "All" ? styles.activeCard : ""
+              }`}
+              onClick={() => setSelectedRole("All")}
+            >
+              <FaUsers className={styles.summaryIcon} />
+              <div className={styles.summaryText}>
+                <h4>All</h4>
+                <p>{totalAll}</p>
+              </div>
+            </div>
 
-  <div
-    className={`${styles.summaryCard} ${selectedRole === "All" ? styles.activeCard : ""}`}
-    onClick={() => setSelectedRole("All")}
-  >
-    <FaUsers className={styles.summaryIcon} />
-    <div className={styles.summaryText}>
-      <h4>All</h4>
-      <p>{totalAll}</p>
-    </div>
-  </div>
+            <div
+              className={`${styles.summaryCard} ${
+                selectedRole === "Admin" ? styles.activeCard : ""
+              }`}
+              onClick={() => setSelectedRole("Admin")}
+            >
+              <FaUserShield className={styles.summaryIcon} />
+              <div className={styles.summaryText}>
+                <h4>Admin</h4>
+                <p>{totalAdmins}</p>
+              </div>
+            </div>
 
-  <div
-    className={`${styles.summaryCard} ${selectedRole === "Admin" ? styles.activeCard : ""}`}
-    onClick={() => setSelectedRole("Admin")}
-  >
-    <FaUserShield className={styles.summaryIcon} />
-    <div className={styles.summaryText}>
-      <h4>Admin</h4>
-      <p>{totalAdmins}</p>
-    </div>
-  </div>
+            <div
+              className={`${styles.summaryCard} ${
+                selectedRole === "Responder" ? styles.activeCard : ""
+              }`}
+              onClick={() => setSelectedRole("Responder")}
+            >
+              <FaUserTie className={styles.summaryIcon} />
+              <div className={styles.summaryText}>
+                <h4>Responder</h4>
+                <p>{totalResponders}</p>
+              </div>
+            </div>
 
-  <div
-    className={`${styles.summaryCard} ${selectedRole === "Responder" ? styles.activeCard : ""}`}
-    onClick={() => setSelectedRole("Responder")}
-  >
-    <FaUserTie className={styles.summaryIcon} />
-    <div className={styles.summaryText}>
-      <h4>Responder</h4>
-      <p>{totalResponders}</p>
-    </div>
-  </div>
-
-  <div
-    className={`${styles.summaryCard} ${selectedRole === "User" ? styles.activeCard : ""}`}
-    onClick={() => setSelectedRole("User")}
-  >
-    <FaUser className={styles.summaryIcon} />
-    <div className={styles.summaryText}>
-      <h4>User</h4>
-      <p>{totalUsers}</p>
-    </div>
-  </div>
-
-</div>
+            <div
+              className={`${styles.summaryCard} ${
+                selectedRole === "User" ? styles.activeCard : ""
+              }`}
+              onClick={() => setSelectedRole("User")}
+            >
+              <FaUser className={styles.summaryIcon} />
+              <div className={styles.summaryText}>
+                <h4>User</h4>
+                <p>{totalUsers}</p>
+              </div>
+            </div>
+          </div>
 
           <div className={styles.tableSection}>
             <div className={styles.filters}>
@@ -297,7 +398,9 @@ export default function UsersPage() {
               <div className={styles.pagination}>
                 <button
                   className={styles.pageBtn}
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
                   disabled={currentPage === 1}
                 >
                   Prev
@@ -324,19 +427,37 @@ export default function UsersPage() {
 
       {selectedUser && (
         <div className={styles.modalOverlay} onClick={closeModal}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className={styles.modalTitle}>User Information</h3>
 
             <div className={styles.modalDetails}>
-              <p><strong>ID:</strong> {selectedUser.id}</p>
-              <p><strong>Name:</strong> {selectedUser.name ?? "N/A"}</p>
-              <p><strong>Role:</strong> {selectedUser.role ?? "N/A"}</p>
-              <p><strong>Contact:</strong> {selectedUser.contact ?? "N/A"}</p>
-              <p><strong>Address:</strong> {selectedUser.address ?? "N/A"}</p>
-              <p><strong>Email:</strong> {selectedUser.email ?? "N/A"}</p>
+              <p>
+                <strong>ID:</strong> {selectedUser.id}
+              </p>
+              <p>
+                <strong>Name:</strong> {selectedUser.name ?? "N/A"}
+              </p>
+              <p>
+                <strong>Role:</strong> {selectedUser.role ?? "N/A"}
+              </p>
+              <p>
+                <strong>Contact:</strong> {selectedUser.contact ?? "N/A"}
+              </p>
+              <p>
+                <strong>Address:</strong> {selectedUser.address ?? "N/A"}
+              </p>
+              <p>
+                <strong>Email:</strong> {selectedUser.email ?? "N/A"}
+              </p>
               <p>
                 <strong>Created Time:</strong>{" "}
-                {formatCreatedAt(selectedUser.createdAt, selectedUser.created_time)}
+                {formatCreatedAt(
+                  selectedUser.createdAt,
+                  selectedUser.created_time,
+                )}
               </p>
             </div>
 
@@ -348,16 +469,62 @@ export default function UsersPage() {
       )}
 
       {editTarget && (
-        <div className={styles.modalOverlay} onClick={() => setEditTarget(null)}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3 className={styles.modalTitle}>Edit Responder Status</h3>
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setEditTarget(null)}
+        >
+          <div
+            className={styles.modalContentEdit}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className={styles.modalTitle}>Edit User Account</h3>
+
+            <div className={styles.formGroup}>
+              <label className={styles.inputLabel}>Name</label>
+              <input
+                type="text"
+                value={editTarget.name ?? ""}
+                onChange={(e) =>
+                  setEditTarget((prev) =>
+                    prev ? { ...prev, name: e.target.value } : null,
+                  )
+                }
+                className={styles.inputField}
+                placeholder="Enter full name"
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.inputLabel}>Contact Number</label>
+              <input
+                type="text"
+                value={editTarget.contact ?? ""}
+                onChange={(e) =>
+                  setEditTarget((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          contact: e.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 11),
+                        }
+                      : null,
+                  )
+                }
+                className={styles.inputField}
+                placeholder="Enter contact number"
+              />
+            </div>
+
             {norm(currentRole) === "superadmin" && (
-              <>
-                <label className={styles.inputLabel}><strong>Role:</strong></label>
+              <div className={styles.formGroup}>
+                <label className={styles.inputLabel}>Role</label>
                 <select
                   value={editTarget.role ?? "user"}
                   onChange={(e) =>
-                    setEditTarget((prev) => prev && { ...prev, role: e.target.value })
+                    setEditTarget((prev) =>
+                      prev ? { ...prev, role: e.target.value } : null,
+                    )
                   }
                   className={styles.inputField}
                 >
@@ -366,18 +533,17 @@ export default function UsersPage() {
                   <option value="responder">responder</option>
                   <option value="user">user</option>
                 </select>
-              </>
+              </div>
             )}
 
-            <div className={styles.modalDetails}>
-              <p><strong>Name:</strong> {editTarget.name ?? "N/A"}</p>
-              <p><strong>Role:</strong> {editTarget.role ?? "N/A"}</p>
-
-              <label className={styles.inputLabel}><strong>Status:</strong></label>
+            <div className={styles.formGroup}>
+              <label className={styles.inputLabel}>Status</label>
               <select
                 value={editTarget.status ?? "Available"}
                 onChange={(e) =>
-                  setEditTarget((prev) => prev && { ...prev, status: e.target.value })
+                  setEditTarget((prev) =>
+                    prev ? { ...prev, status: e.target.value } : null,
+                  )
                 }
                 className={styles.inputField}
               >
@@ -394,98 +560,20 @@ export default function UsersPage() {
                   </>
                 )}
               </select>
-
-              <p><strong>Email:</strong> {editTarget.email ?? "N/A"}</p>
-              <p><strong>Contact:</strong> {editTarget.contact ?? "N/A"}</p>
             </div>
 
-            <button
-              className={styles.saveBtn}
-              onClick={async () => {
-                if (!editTarget) return;
+            <div className={styles.modalActions}>
+              <button className={styles.saveBtn} onClick={handleSave}>
+                <span>Save</span>
+              </button>
 
-                try {
-                  if (!canEditUser(editTarget)) {
-                    alert("You are not allowed to edit this account.");
-                    return;
-                  }
-
-                  const payload: Record<string, unknown> = {
-                    status: editTarget.status,
-                  };
-
-                  if (norm(currentRole) === "superadmin") {
-                    const nextRole = norm(editTarget.role);
-                    payload.role = editTarget.role;
-
-                    if (nextRole === "admin" || nextRole === "superadmin") {
-                      const nextStatusRaw = norm(editTarget.status);
-                      const isAllowedAdminStatus =
-                        nextStatusRaw === "approved" ||
-                        nextStatusRaw === "pending" ||
-                        nextStatusRaw === "declined";
-
-                      const nextStatus = isAllowedAdminStatus
-                        ? nextStatusRaw.charAt(0).toUpperCase() + nextStatusRaw.slice(1)
-                        : "Approved";
-
-                      payload.status = nextStatus;
-                      payload.approved = nextStatus === "Approved";
-                    } else if (nextRole === "responder") {
-                      payload.approved = true;
-                      payload.status =
-                        norm(editTarget.status) === "unavailable" ? "Unavailable" : "Available";
-                    }
-                  }
-
-                  await updateDoc(doc(db, "users", editTarget.id), payload);
-
-                  const currentUser = auth.currentUser;
-                  if (currentUser && (norm(currentRole) === "admin" || norm(currentRole) === "superadmin")) {
-                    await logActivity({
-                      actorUid: currentUser.uid,
-                      actorEmail: currentUser.email || "",
-                      actorName: currentUser.displayName || "",
-                      actorRole: currentRole,
-                      action: "edit_user_account",
-                      targetId: editTarget.id,
-                      targetType: norm(editTarget.role) || "user",
-                      details: `Updated role/status to ${editTarget.role || "N/A"}/${editTarget.status || "N/A"}`,
-                      path: "/dashboard/users",
-                    });
-                  }
-
-                  setUsers((prev) =>
-                    prev.map((u) =>
-                      u.id === editTarget.id
-                        ? { ...u, status: editTarget.status, role: editTarget.role }
-                        : u
-                    )
-                  );
-
-                  setShowSuccess(true);
-                  setTimeout(() => setShowSuccess(false), 2000);
-                } catch (err) {
-                  console.error("Error updating status:", err);
-                  const message =
-                    typeof err === "object" && err && "message" in err
-                      ? String((err as { message?: string }).message)
-                      : "Failed to update status.";
-                  alert(message);
-                }
-
-                setEditTarget(null);
-              }}
-            >
-              <span>Save</span>
-            </button>
-
-            <button
-              className={styles.closeBtn}
-              onClick={() => setEditTarget(null)}
-            >
-              <span>Cancel</span>
-            </button>
+              <button
+                className={styles.closeBtn}
+                onClick={() => setEditTarget(null)}
+              >
+                <span>Cancel</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -493,8 +581,15 @@ export default function UsersPage() {
       {showSuccess && (
         <div className={styles.successOverlay}>
           <div className={styles.successModal}>
-            <h3>Status Updated!</h3>
-            <p>The responder’s status has been successfully saved.</p>
+            <h3>User Updated!</h3>
+            <p>The account information has been successfully saved.</p>
+
+            <button
+              className={styles.okBtn}
+              onClick={() => setShowSuccess(false)}
+            >
+              <span>OK</span>
+            </button>
           </div>
         </div>
       )}

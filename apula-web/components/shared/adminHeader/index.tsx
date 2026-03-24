@@ -14,7 +14,7 @@ import {
   LogOut,
   Send,
   ClipboardList,
-  CarFront, Car,
+  Car,
   MapPin,
   Menu,
   X,
@@ -28,6 +28,8 @@ import {
   getDoc,
   collection,
   onSnapshot,
+  query,
+  where,
 } from "firebase/firestore";
 import { logActivity } from "@/lib/activityLog";
 
@@ -39,8 +41,10 @@ export default function AdminHeader() {
   const pathname = usePathname();
 
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
+  const [unassignedCount, setUnassignedCount] = useState(0);
   const [currentUid, setCurrentUid] = useState("");
-
+  const [greeting, setGreeting] = useState("Good Morning");
 
   const lastLoggedPathRef = useRef<string>("");
 
@@ -60,6 +64,14 @@ export default function AdminHeader() {
     return match ? match[0].toUpperCase() : "U";
   };
 
+  const getGreetingByHour = (date: Date) => {
+    const hour = date.getHours();
+
+    if (hour < 12) return "Good Morning";
+    if (hour < 18) return "Good Afternoon";
+    return "Good Evening";
+  };
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -69,9 +81,21 @@ export default function AdminHeader() {
     }
   };
 
-  
+  useEffect(() => {
+    const updateGreeting = () => {
+      setGreeting(getGreetingByHour(new Date()));
+    };
 
-  // 🔥 Realtime unread count (GLOBAL)
+    updateGreeting();
+
+    const interval = setInterval(() => {
+      updateGreeting();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // realtime unread notifications count
   useEffect(() => {
     if (!currentUid) {
       setUnreadCount(0);
@@ -109,9 +133,52 @@ export default function AdminHeader() {
     };
   }, [currentUid]);
 
-  
+  // pending responder account requests
+  useEffect(() => {
+    const unsubscribePendingRequests = onSnapshot(
+      query(
+        collection(db, "users"),
+        where("role", "==", "responder"),
+        where("approved", "==", false)
+      ),
+      (snapshot) => {
+        setPendingRequestCount(snapshot.size);
+      }
+    );
 
-  // 👤 Load user name/role
+    return () => unsubscribePendingRequests();
+  }, []);
+
+  // approved responders with no team yet
+  useEffect(() => {
+    const unsubscribeUnassigned = onSnapshot(
+      query(
+        collection(db, "users"),
+        where("role", "==", "responder"),
+        where("approved", "==", true)
+      ),
+      (snapshot) => {
+        const count = snapshot.docs.filter((docSnap) => {
+          const data = docSnap.data();
+          const teamId = data.teamId;
+          const teamName = data.teamName;
+
+          return (
+            !teamId ||
+            String(teamId).trim() === "" ||
+            !teamName ||
+            String(teamName).trim() === ""
+          );
+        }).length;
+
+        setUnassignedCount(count);
+      }
+    );
+
+    return () => unsubscribeUnassigned();
+  }, []);
+
+  // load logged in user
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -119,6 +186,7 @@ export default function AdminHeader() {
         setUserName("Guest");
         setInitial(getFirstNameInitial("Guest"));
         setCurrentUid("");
+
         if (pathname.startsWith("/dashboard")) {
           window.location.replace("/login?reason=auth-required");
         }
@@ -129,6 +197,7 @@ export default function AdminHeader() {
 
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
+
         if (userDoc.exists()) {
           const data = userDoc.data();
           const name = data.name || "User";
@@ -152,18 +221,11 @@ export default function AdminHeader() {
   }, [pathname]);
 
   useEffect(() => {
-    if (role !== "admin") {
-      return;
-    }
-
-    if (!pathname || lastLoggedPathRef.current === pathname) {
-      return;
-    }
+    if (role !== "admin" && role !== "superadmin") return;
+    if (!pathname || lastLoggedPathRef.current === pathname) return;
 
     const currentUser = auth.currentUser;
-    if (!currentUser) {
-      return;
-    }
+    if (!currentUser) return;
 
     lastLoggedPathRef.current = pathname;
 
@@ -182,7 +244,6 @@ export default function AdminHeader() {
 
   return (
     <>
-      {/* Sidebar */}
       <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ""}`}>
         <div className={styles.sidebarHeader}>
           <Image src="/logo.png" alt="Sidebar Logo" width={150} height={75} />
@@ -206,7 +267,6 @@ export default function AdminHeader() {
             <span>Dashboard</span>
           </a>
 
-          {/* Notifications with real-time badge */}
           <a
             href="/dashboard/notifications"
             className={`${styles.sidebarLink} ${
@@ -252,33 +312,41 @@ export default function AdminHeader() {
             }`}
             onClick={() => setSidebarOpen(false)}
           >
-            <UserCheck size={18} className={styles.icon} />
-            <span>Request</span>
+            <div className={styles.notifWrapper}>
+              <UserCheck size={18} className={styles.icon} />
+              <span>Request</span>
+              {pendingRequestCount > 0 && (
+                <span className={styles.badge}>{pendingRequestCount}</span>
+              )}
+            </div>
           </a>
 
-<a
-  href="/dashboard/Management"
-  className={`${styles.sidebarLink} ${
-    isActive("/dashboard/Management") ? styles.activeLink : ""
-  }`}
-  onClick={() => setSidebarOpen(false)}
->
-  <Car size={18} className={styles.icon} />
-  <span>Truck & Team</span>
-</a>
-
+          <a
+            href="/dashboard/Management"
+            className={`${styles.sidebarLink} ${
+              isActive("/dashboard/Management") ? styles.activeLink : ""
+            }`}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <Car size={18} className={styles.icon} />
+            <span>Truck & Team</span>
+          </a>
 
           <a
-  href="/dashboard/Assign"
-  className={`${styles.sidebarLink} ${
-    isActive("/dashboard/Assign") ? styles.activeLink : ""
-  }`}
+            href="/dashboard/Assign"
+            className={`${styles.sidebarLink} ${
+              isActive("/dashboard/Assign") ? styles.activeLink : ""
+            }`}
             onClick={() => setSidebarOpen(false)}
->
-  <ClipboardList size={18} className={styles.icon} />
-<span>Assign</span>
-
-</a>
+          >
+            <div className={styles.notifWrapper}>
+              <ClipboardList size={18} className={styles.icon} />
+              <span>Assign</span>
+              {unassignedCount > 0 && (
+                <span className={styles.badge}>{unassignedCount}</span>
+              )}
+            </div>
+          </a>
 
           <a
             href="/dashboard/stations"
@@ -291,7 +359,7 @@ export default function AdminHeader() {
             <span>Stations</span>
           </a>
 
-          {<a
+          <a
             href="/dashboard/dispatch"
             className={`${styles.sidebarLink} ${
               isActive("/dashboard/dispatch") ? styles.activeLink : ""
@@ -300,7 +368,7 @@ export default function AdminHeader() {
           >
             <Send size={18} className={styles.icon} />
             <span>Dispatch</span>
-          </a>/* DISPATCHER ONLY */}
+          </a>
 
           <a
             href="/dashboard/reports"
@@ -338,22 +406,29 @@ export default function AdminHeader() {
         />
       )}
 
-      {/* Header */}
       <header className={styles.header}>
         <div className={styles.logoWrapper}>
           <div className={styles.menuWrapper}>
-            <button className={styles.menuButton} onClick={toggleSidebar} aria-label="Open sidebar" type="button">
+            <button
+              className={styles.menuButton}
+              onClick={toggleSidebar}
+              aria-label="Open sidebar"
+              type="button"
+            >
               <Menu size={22} />
             </button>
-            {unreadCount > 0 && <span className={styles.menuBadge}>{unreadCount}</span>}
+            {unreadCount > 0 && (
+              <span className={styles.menuBadge}>{unreadCount}</span>
+            )}
           </div>
           <Image src="/logo.png" alt="Logo" width={100} height={50} />
         </div>
 
         <div className={styles.rightWrapper}>
           <div className={styles.userInfo}>
-            <span className={styles.userName}>Welcome, {userName}!</span>
-            <div className={styles.userIcon}>{initial}</div>
+            <span className={styles.userName}>
+              {greeting}, {userName}
+            </span>
           </div>
         </div>
       </header>

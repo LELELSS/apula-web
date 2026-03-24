@@ -7,13 +7,10 @@ import { FaUsers, FaTruck } from "react-icons/fa";
 
 import {
   collection,
-  addDoc,
   onSnapshot,
   query,
   where,
   doc,
-  updateDoc,
-  deleteDoc,
   writeBatch,
   getDocs,
   serverTimestamp,
@@ -45,6 +42,15 @@ export default function TeamVehiclePage() {
   const [editingTeam, setEditingTeam] = useState<any | null>(null);
   const [editingVehicle, setEditingVehicle] = useState<any | null>(null);
 
+  // DELETE CONFIRM MODAL STATE
+  const [confirmDelete, setConfirmDelete] = useState<{
+    type: "team" | "vehicle";
+    id: string;
+  } | null>(null);
+
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   // ------------------------------------------
   // Helpers
   // ------------------------------------------
@@ -52,14 +58,14 @@ export default function TeamVehiclePage() {
     if (!raw) return "";
     const low = String(raw).toLowerCase();
     if (low === "active") return "Available";
-    if (low === "available" || low === "dispatched" || low === "unavailable")
+    if (low === "available" || low === "dispatched" || low === "unavailable") {
       return raw;
-    // fallback
+    }
     return raw;
   };
 
   // ------------------------------------------
-  // Load Teams (normalize status)
+  // Load Teams
   // ------------------------------------------
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "teams"), (snap) => {
@@ -71,14 +77,14 @@ export default function TeamVehiclePage() {
             ...data,
             status: normalizeStatus(data.status || "Available"),
           };
-        })
+        }),
       );
     });
     return () => unsub();
   }, []);
 
   // ------------------------------------------
-  // Load Vehicles (normalize status)
+  // Load Vehicles
   // ------------------------------------------
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "vehicles"), (snap) => {
@@ -90,14 +96,14 @@ export default function TeamVehiclePage() {
             ...data,
             status: normalizeStatus(data.status || "Available"),
           };
-        })
+        }),
       );
     });
     return () => unsub();
   }, []);
 
   // ------------------------------------------
-  // Load Responders (for leader dropdown & member counts)
+  // Load Responders
   // ------------------------------------------
   useEffect(() => {
     const q = query(collection(db, "users"), where("role", "==", "responder"));
@@ -108,278 +114,301 @@ export default function TeamVehiclePage() {
   }, []);
 
   // ------------------------------------------
-  // Create team (defaults to Available)
+  // Create team
   // ------------------------------------------
- const createTeam = async () => {
-  if (!newTeamName.trim()) {
-  setErrorMessage("Please enter team name.");
-  return;
-}
-
-if (!selectedLeader) {
-  setErrorMessage("Please select a leader.");
-  return;
-}
-
-  try {
-    const leader = responders.find((r) => r.id === selectedLeader);
-    if (!leader) {
-      setErrorMessage("Selected leader not found.");
+  const createTeam = async () => {
+    if (!newTeamName.trim()) {
+      setErrorMessage("Please enter team name.");
       return;
     }
 
-    const batch = writeBatch(db);
+    if (!selectedLeader) {
+      setErrorMessage("Please select a leader.");
+      return;
+    }
 
-    // ✅ Create team ref
-    const teamRef = doc(collection(db, "teams"));
+    try {
+      const leader = responders.find((r) => r.id === selectedLeader);
+      if (!leader) {
+        setErrorMessage("Selected leader not found.");
+        return;
+      }
 
-    // ✅ TEAM DOC
-    batch.set(teamRef, {
-      teamName: newTeamName.trim(),
-      leaderId: leader.id,
-      leaderName: leader.name,
-      members: [
-        {
-          id: leader.id,
-          name: leader.name,
-          status: leader.status || "Available",
-          teamName: newTeamName.trim(),
-        },
-      ],
-      status: "Available",
-      createdAt: serverTimestamp(),
-    });
+      // ✅ prevent assigning a responder who is already a leader
+      const existingLeaderTeam = teams.find((t) => t.leaderId === leader.id);
 
-    // ✅ UPDATE LEADER USER (NO VEHICLE HERE)
-   batch.update(doc(db, "users", leader.id), {
-  teamId: teamRef.id,
-  teamName: newTeamName.trim(),
-  vehicleId: "",
-  vehicleCode: "",
-  vehiclePlate: "",
-  status: "Available",
-});
+      if (existingLeaderTeam) {
+        setErrorMessage(
+          `${leader.name} is already assigned as leader of team ${existingLeaderTeam.teamName}.`,
+        );
+        return;
+      }
 
-    await batch.commit();
+      const batch = writeBatch(db);
+      const teamRef = doc(collection(db, "teams"));
 
-    setNewTeamName("");
-    setSelectedLeader("");
-    setShowAddTeamModal(false);
-    setSuccessMessage("Team created successfully.");
-  } catch (err) {
-    console.error(err);
-    setErrorMessage("Error creating team.");
-  }
-};
+      batch.set(teamRef, {
+        teamName: newTeamName.trim(),
+        leaderId: leader.id,
+        leaderName: leader.name,
+        members: [
+          {
+            id: leader.id,
+            name: leader.name,
+            status: leader.status || "Available",
+            teamName: newTeamName.trim(),
+          },
+        ],
+        status: "Available",
+        createdAt: serverTimestamp(),
+      });
 
+      batch.update(doc(db, "users", leader.id), {
+        teamId: teamRef.id,
+        teamName: newTeamName.trim(),
+        vehicleId: "",
+        vehicleCode: "",
+        vehiclePlate: "",
+        status: "Available",
+      });
+
+      await batch.commit();
+
+      setNewTeamName("");
+      setSelectedLeader("");
+      setShowAddTeamModal(false);
+      setSuccessMessage("Team created successfully.");
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("Error creating team.");
+    }
+  };
 
   // ------------------------------------------
   // Create vehicle
   // ------------------------------------------
- const createVehicle = async () => {
-  if (!vehicleCode.trim()) {
-    setErrorMessage("Please enter vehicle code.");
-    return;
-  }
+  const createVehicle = async () => {
+    if (!vehicleCode.trim()) {
+      setErrorMessage("Please enter vehicle code.");
+      return;
+    }
 
-  if (!vehiclePlate.trim()) {
-    setErrorMessage("Please enter plate number.");
-    return;
-  }
+    if (!vehiclePlate.trim()) {
+      setErrorMessage("Please enter plate number.");
+      return;
+    }
 
-  if (!vehicleTeam.trim()) {
-    setErrorMessage("Please select an assigned team.");
-    return;
-  }
+    if (!vehicleTeam.trim()) {
+      setErrorMessage("Please select an assigned team.");
+      return;
+    }
 
-  try {
-    const batch = writeBatch(db);
+    try {
+      const batch = writeBatch(db);
 
-    const teamDoc = teams.find((t) => t.id === vehicleTeam);
-    const vehicleRef = doc(collection(db, "vehicles"));
+      const teamDoc = teams.find((t) => t.id === vehicleTeam);
+      const vehicleRef = doc(collection(db, "vehicles"));
 
-    batch.set(vehicleRef, {
-      code: vehicleCode.trim(),
-      plate: vehiclePlate.trim(),
-      assignedTeamId: vehicleTeam,
-      assignedTeam: teamDoc ? teamDoc.teamName : "",
-      status: "Available",
-      createdAt: serverTimestamp(),
-    });
-
-    const usersQuery = query(
-      collection(db, "users"),
-      where("teamId", "==", vehicleTeam)
-    );
-    const usersSnap = await getDocs(usersQuery);
-
-    usersSnap.docs.forEach((d) => {
-      batch.update(doc(db, "users", d.id), {
-        vehicleId: vehicleRef.id,
-        vehicleCode: vehicleCode.trim(),
-        vehiclePlate: vehiclePlate.trim(),
+      batch.set(vehicleRef, {
+        code: vehicleCode.trim(),
+        plate: vehiclePlate.trim(),
+        assignedTeamId: vehicleTeam,
+        assignedTeam: teamDoc ? teamDoc.teamName : "",
+        status: "Available",
+        createdAt: serverTimestamp(),
       });
-    });
 
-    await batch.commit();
+      const usersQuery = query(
+        collection(db, "users"),
+        where("teamId", "==", vehicleTeam),
+      );
+      const usersSnap = await getDocs(usersQuery);
 
-    setVehicleCode("");
-    setVehiclePlate("");
-    setVehicleTeam("");
-    setShowAddVehicleModal(false);
-    setSuccessMessage("Vehicle added successfully.");
-  } catch (err) {
-    console.error(err);
-    setErrorMessage("Error adding vehicle.");
-  }
-};
+      usersSnap.docs.forEach((d) => {
+        batch.update(doc(db, "users", d.id), {
+          vehicleId: vehicleRef.id,
+          vehicleCode: vehicleCode.trim(),
+          vehiclePlate: vehiclePlate.trim(),
+        });
+      });
+
+      await batch.commit();
+
+      setVehicleCode("");
+      setVehiclePlate("");
+      setVehicleTeam("");
+      setShowAddVehicleModal(false);
+      setSuccessMessage("Vehicle added successfully.");
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("Error adding vehicle.");
+    }
+  };
 
   // ------------------------------------------
   // Open Edit Team modal
   // ------------------------------------------
   const openEditTeam = (team: any) => {
-  setEditingTeam({
-    ...team,
-    status: normalizeStatus(team.status || "Available"),
-  });
-};
-
-
-
-
-
-  // Save edited team
- const saveEditTeam = async () => {
-  if (!editingTeam) return;
-
-  try {
-    const oldTeam = teams.find((t) => t.id === editingTeam.id);
-    const oldLeaderId = oldTeam?.leaderId || "";
-
-    const teamRef = doc(db, "teams", editingTeam.id);
-    const batch = writeBatch(db);
-
-    const newLeaderId = editingTeam.leaderId;
-    const newLeader = responders.find((r) => r.id === newLeaderId);
-
-    const updatedMembers = newLeader
-      ? [
-          {
-            id: newLeader.id,
-            name: newLeader.name,
-            status: editingTeam.status || "Available",
-            teamName: editingTeam.teamName,
-          },
-        ]
-      : [];
-
-    batch.update(teamRef, {
-      teamName: editingTeam.teamName,
-      leaderId: newLeaderId,
-      leaderName: newLeader?.name || "",
-      members: updatedMembers,
-      status: editingTeam.status,
+    setEditingTeam({
+      ...team,
+      status: normalizeStatus(team.status || "Available"),
     });
+  };
 
-    const respondersQuery = query(
-      collection(db, "users"),
-      where("teamId", "==", editingTeam.id)
-    );
-    const respondersSnap = await getDocs(respondersQuery);
+  // ------------------------------------------
+  // Save edited team
+  // ------------------------------------------
+  const saveEditTeam = async () => {
+    if (!editingTeam) return;
 
-    respondersSnap.docs.forEach((userDoc) => {
-      batch.update(doc(db, "users", userDoc.id), {
+    try {
+      const oldTeam = teams.find((t) => t.id === editingTeam.id);
+      const oldLeaderId = oldTeam?.leaderId || "";
+
+      const teamRef = doc(db, "teams", editingTeam.id);
+      const batch = writeBatch(db);
+
+      const newLeaderId = editingTeam.leaderId;
+      const newLeader = responders.find((r) => r.id === newLeaderId);
+
+      if (!newLeaderId) {
+        setErrorMessage("Please select a leader.");
+        return;
+      }
+
+      if (!newLeader) {
+        setErrorMessage("Selected leader not found.");
+        return;
+      }
+
+      // ✅ prevent assigning a responder who is already a leader of another team
+      const existingLeaderTeam = teams.find(
+        (t) => t.leaderId === newLeaderId && t.id !== editingTeam.id,
+      );
+
+      if (existingLeaderTeam) {
+        setErrorMessage(
+          `${newLeader.name} is already assigned as leader of team ${existingLeaderTeam.teamName}.`,
+        );
+        return;
+      }
+
+      const updatedMembers = [
+        {
+          id: newLeader.id,
+          name: newLeader.name,
+          status: editingTeam.status || "Available",
+          teamName: editingTeam.teamName,
+        },
+      ];
+
+      batch.update(teamRef, {
         teamName: editingTeam.teamName,
+        leaderId: newLeaderId,
+        leaderName: newLeader.name,
+        members: updatedMembers,
         status: editingTeam.status,
       });
-    });
 
-    if (oldLeaderId && oldLeaderId !== newLeaderId) {
-      batch.update(doc(db, "users", oldLeaderId), {
-        teamId: "",
-        teamName: "",
-        vehicleId: "",
-        vehicleCode: "",
-        vehiclePlate: "",
-        status: "Available",
+      const respondersQuery = query(
+        collection(db, "users"),
+        where("teamId", "==", editingTeam.id),
+      );
+      const respondersSnap = await getDocs(respondersQuery);
+
+      respondersSnap.docs.forEach((userDoc) => {
+        batch.update(doc(db, "users", userDoc.id), {
+          teamName: editingTeam.teamName,
+          status: editingTeam.status,
+        });
       });
-    }
 
-    if (newLeader) {
+      if (oldLeaderId && oldLeaderId !== newLeaderId) {
+        batch.update(doc(db, "users", oldLeaderId), {
+          teamId: "",
+          teamName: "",
+          vehicleId: "",
+          vehicleCode: "",
+          vehiclePlate: "",
+          status: "Available",
+        });
+      }
+
       batch.update(doc(db, "users", newLeader.id), {
         teamId: editingTeam.id,
         teamName: editingTeam.teamName,
         status: editingTeam.status,
       });
+
+      const vehiclesQuery = query(
+        collection(db, "vehicles"),
+        where("assignedTeamId", "==", editingTeam.id),
+      );
+      const vehiclesSnap = await getDocs(vehiclesQuery);
+
+      vehiclesSnap.docs.forEach((vehicleDoc) => {
+        batch.update(doc(db, "vehicles", vehicleDoc.id), {
+          assignedTeam: editingTeam.teamName,
+          status: editingTeam.status,
+        });
+      });
+
+      await batch.commit();
+
+      setEditingTeam(null);
+      setSuccessMessage("Team updated successfully.");
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("Error updating team.");
     }
+  };
 
-    const vehiclesQuery = query(
-      collection(db, "vehicles"),
-      where("assignedTeamId", "==", editingTeam.id)
-    );
-    const vehiclesSnap = await getDocs(vehiclesQuery);
-
-    vehiclesSnap.docs.forEach((vehicleDoc) => {
-      batch.update(doc(db, "vehicles", vehicleDoc.id), {
-        assignedTeam: editingTeam.teamName,
-        status: editingTeam.status,
-      });
-    });
-
-    await batch.commit();
-
-    setEditingTeam(null);
-    setSuccessMessage("Team updated successfully.");
-  } catch (err) {
-    console.error(err);
-    setErrorMessage("Error updating team.");
-  }
-};
-
-// DELETE CONFIRM MODAL STATE
-const [confirmDelete, setConfirmDelete] = useState<{
-  type: "team" | "vehicle";
-  id: string;
-} | null>(null);
-
+  // ------------------------------------------
   // Delete team
- const deleteTeam = async (teamId: string) => {
-  try {
-    const usersQuery = query(collection(db, "users"), where("teamId", "==", teamId));
-    const usersSnap = await getDocs(usersQuery);
+  // ------------------------------------------
+  const deleteTeam = async (teamId: string) => {
+    try {
+      const usersQuery = query(
+        collection(db, "users"),
+        where("teamId", "==", teamId),
+      );
+      const usersSnap = await getDocs(usersQuery);
 
-    const vehiclesQuery = query(collection(db, "vehicles"), where("assignedTeamId", "==", teamId));
-    const vehiclesSnap = await getDocs(vehiclesQuery);
+      const vehiclesQuery = query(
+        collection(db, "vehicles"),
+        where("assignedTeamId", "==", teamId),
+      );
+      const vehiclesSnap = await getDocs(vehiclesQuery);
 
-    const batch = writeBatch(db);
+      const batch = writeBatch(db);
 
-    usersSnap.docs.forEach((d) => {
-      batch.update(doc(db, "users", d.id), {
-        teamId: "",
-        teamName: "",
-        vehicleId: "",
-        vehicleCode: "",
-        vehiclePlate: "",
-        status: "Available",
+      usersSnap.docs.forEach((d) => {
+        batch.update(doc(db, "users", d.id), {
+          teamId: "",
+          teamName: "",
+          vehicleId: "",
+          vehicleCode: "",
+          vehiclePlate: "",
+          status: "Available",
+        });
       });
-    });
 
-    vehiclesSnap.docs.forEach((d) => {
-      batch.update(doc(db, "vehicles", d.id), {
-        assignedTeamId: "",
-        assignedTeam: "",
-        status: "Available",
+      vehiclesSnap.docs.forEach((d) => {
+        batch.update(doc(db, "vehicles", d.id), {
+          assignedTeamId: "",
+          assignedTeam: "",
+          status: "Available",
+        });
       });
-    });
 
-    batch.delete(doc(db, "teams", teamId));
+      batch.delete(doc(db, "teams", teamId));
 
-    await batch.commit();
-  } catch (err) {
-    console.error(err);
-    setErrorMessage("Error deleting team.");
-  }
-};
+      await batch.commit();
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("Error deleting team.");
+    }
+  };
 
   // ------------------------------------------
   // Open Edit Vehicle modal
@@ -389,87 +418,91 @@ const [confirmDelete, setConfirmDelete] = useState<{
       id: v.id,
       code: v.code || "",
       plate: v.plate || "",
-      assignedTeamId: v.assignedTeamId || v.assignedTeamId || "",
-      // keep assignedTeamName for display, but we'll set assignedTeamId & assignedTeamName on save
+      assignedTeamId: v.assignedTeamId || "",
       status: normalizeStatus(v.status || "Available"),
     });
     setShowAddVehicleModal(false);
   };
 
+  // ------------------------------------------
   // Save edited vehicle
- const saveEditVehicle = async () => {
-  if (!editingVehicle) return;
+  // ------------------------------------------
+  const saveEditVehicle = async () => {
+    if (!editingVehicle) return;
 
-  try {
-    const batch = writeBatch(db);
-    const vehicleRef = doc(db, "vehicles", editingVehicle.id);
-
-    const oldVehicle = vehicles.find((v) => v.id === editingVehicle.id);
-    const oldAssignedTeamId = oldVehicle?.assignedTeamId || "";
-
-    const newTeam = teams.find((t) => t.id === editingVehicle.assignedTeamId);
-
-    batch.update(vehicleRef, {
-      code: editingVehicle.code,
-      plate: editingVehicle.plate,
-      assignedTeamId: newTeam?.id || "",
-      assignedTeam: newTeam?.teamName || "",
-      status: editingVehicle.status || "Available",
-    });
-
-    if (oldAssignedTeamId && oldAssignedTeamId !== editingVehicle.assignedTeamId) {
-      const oldUsersQuery = query(
-        collection(db, "users"),
-        where("teamId", "==", oldAssignedTeamId)
-      );
-      const oldUsersSnap = await getDocs(oldUsersQuery);
-
-      oldUsersSnap.docs.forEach((d) => {
-        batch.update(doc(db, "users", d.id), {
-          vehicleId: "",
-          vehicleCode: "",
-          vehiclePlate: "",
-        });
-      });
-    }
-
-    if (newTeam) {
-      const newUsersQuery = query(
-        collection(db, "users"),
-        where("teamId", "==", newTeam.id)
-      );
-      const newUsersSnap = await getDocs(newUsersQuery);
-
-      newUsersSnap.docs.forEach((d) => {
-        batch.update(doc(db, "users", d.id), {
-          vehicleId: editingVehicle.id,
-          vehicleCode: editingVehicle.code,
-          vehiclePlate: editingVehicle.plate,
-        });
-      });
-    }
-
-    await batch.commit();
-    setEditingVehicle(null);
-    setSuccessMessage("Vehicle updated successfully.");
-  } catch (err) {
-    console.error(err);
-    setErrorMessage("Failed to update vehicle.");
-  }
-};
-
-
-
-  // Delete vehicle
-  const deleteVehicle = async (vehicleId: string) => {
-   
     try {
-      // find users assigned to this vehicle (by vehicleId)
-      const q = query(collection(db, "users"), where("vehicleId", "==", vehicleId));
+      const batch = writeBatch(db);
+      const vehicleRef = doc(db, "vehicles", editingVehicle.id);
+
+      const oldVehicle = vehicles.find((v) => v.id === editingVehicle.id);
+      const oldAssignedTeamId = oldVehicle?.assignedTeamId || "";
+
+      const newTeam = teams.find((t) => t.id === editingVehicle.assignedTeamId);
+
+      batch.update(vehicleRef, {
+        code: editingVehicle.code,
+        plate: editingVehicle.plate,
+        assignedTeamId: newTeam?.id || "",
+        assignedTeam: newTeam?.teamName || "",
+        status: editingVehicle.status || "Available",
+      });
+
+      if (
+        oldAssignedTeamId &&
+        oldAssignedTeamId !== editingVehicle.assignedTeamId
+      ) {
+        const oldUsersQuery = query(
+          collection(db, "users"),
+          where("teamId", "==", oldAssignedTeamId),
+        );
+        const oldUsersSnap = await getDocs(oldUsersQuery);
+
+        oldUsersSnap.docs.forEach((d) => {
+          batch.update(doc(db, "users", d.id), {
+            vehicleId: "",
+            vehicleCode: "",
+            vehiclePlate: "",
+          });
+        });
+      }
+
+      if (newTeam) {
+        const newUsersQuery = query(
+          collection(db, "users"),
+          where("teamId", "==", newTeam.id),
+        );
+        const newUsersSnap = await getDocs(newUsersQuery);
+
+        newUsersSnap.docs.forEach((d) => {
+          batch.update(doc(db, "users", d.id), {
+            vehicleId: editingVehicle.id,
+            vehicleCode: editingVehicle.code,
+            vehiclePlate: editingVehicle.plate,
+          });
+        });
+      }
+
+      await batch.commit();
+      setEditingVehicle(null);
+      setSuccessMessage("Vehicle updated successfully.");
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("Failed to update vehicle.");
+    }
+  };
+
+  // ------------------------------------------
+  // Delete vehicle
+  // ------------------------------------------
+  const deleteVehicle = async (vehicleId: string) => {
+    try {
+      const q = query(
+        collection(db, "users"),
+        where("vehicleId", "==", vehicleId),
+      );
       const snap = await getDocs(q);
       const batch = writeBatch(db);
 
-      // clear user vehicle fields
       snap.docs.forEach((d) => {
         const uref = doc(db, "users", d.id);
         batch.update(uref, {
@@ -479,7 +512,6 @@ const [confirmDelete, setConfirmDelete] = useState<{
         });
       });
 
-      // delete vehicle doc
       const vref = doc(db, "vehicles", vehicleId);
       batch.delete(vref);
 
@@ -490,36 +522,28 @@ const [confirmDelete, setConfirmDelete] = useState<{
     }
   };
 
-const handleConfirmDelete = async () => {
-if (!confirmDelete) return;
+  const handleConfirmDelete = async () => {
+    if (!confirmDelete) return;
 
-try {
-if (confirmDelete.type === "team") {
-await deleteTeam(confirmDelete.id);
-setSuccessMessage("Team deleted successfully.");
-} else {
-await deleteVehicle(confirmDelete.id);
-setSuccessMessage("Vehicle deleted successfully.");
-}
-} catch (e) {
-setErrorMessage("Delete failed. Check connection.");
-}
+    try {
+      if (confirmDelete.type === "team") {
+        await deleteTeam(confirmDelete.id);
+        setSuccessMessage("Team deleted successfully.");
+      } else {
+        await deleteVehicle(confirmDelete.id);
+        setSuccessMessage("Vehicle deleted successfully.");
+      }
+    } catch (e) {
+      setErrorMessage("Delete failed. Check connection.");
+    }
 
-setConfirmDelete(null);
-};
+    setConfirmDelete(null);
+  };
 
-
-
-const [successMessage, setSuccessMessage] = useState<string | null>(null);
-const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  // ------------------------------------------
-  // Render
-  // ------------------------------------------
   return (
     <div className={styles.pageWrapper}>
       <AdminHeader />
-          <AlertBellButton />
-    
+      <AlertBellButton />
       <AlertDispatchModal />
 
       <div className={styles.container}>
@@ -527,36 +551,57 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
           <h2 className={styles.pageTitle}>Team & Truck Management</h2>
           <hr className={styles.separator} />
 
-          {/* TABS */}
-          <div className={styles.tabContainer} style={{ display: "flex", gap: 8 }}>
+          <div
+            className={styles.tabContainer}
+            style={{ display: "flex", gap: 8 }}
+          >
             <button
-              className={`${styles.tabBtn} ${activeTab === "teams" ? styles.activeTab : ""}`}
+              className={`${styles.tabBtn} ${
+                activeTab === "teams" ? styles.activeTab : ""
+              }`}
               onClick={() => setActiveTab("teams")}
             >
               <FaUsers /> Teams
             </button>
 
             <button
-              className={`${styles.tabBtn} ${activeTab === "vehicles" ? styles.activeTab : ""}`}
+              className={`${styles.tabBtn} ${
+                activeTab === "vehicles" ? styles.activeTab : ""
+              }`}
               onClick={() => setActiveTab("vehicles")}
             >
               <FaTruck /> Trucks
             </button>
           </div>
 
-          {/* TEAMS */}
           {activeTab === "teams" && (
             <>
-              <div className={styles.headerRow} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div
+                className={styles.headerRow}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
                 <h3 className={styles.subTitle}>Teams</h3>
                 <div>
-                  <button className={styles.addBtn} onClick={() => { setShowAddTeamModal(true); setEditingTeam(null); }}>
+                  <button
+                    className={styles.addBtn}
+                    onClick={() => {
+                      setShowAddTeamModal(true);
+                      setEditingTeam(null);
+                    }}
+                  >
                     + Add Team
                   </button>
                 </div>
               </div>
 
-              <table className={styles.dataTable} style={{ width: "100%", borderCollapse: "collapse" }}>
+              <table
+                className={styles.dataTable}
+                style={{ width: "100%", borderCollapse: "collapse" }}
+              >
                 <thead>
                   <tr>
                     <th>Team Name</th>
@@ -569,23 +614,23 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
                 <tbody>
                   {teams.map((team) => {
-                    const memberCount = responders.filter((r) => r.teamId === team.id).length;
+                    const memberCount = responders.filter(
+                      (r) => r.teamId === team.id,
+                    ).length;
 
                     return (
                       <tr key={team.id}>
                         <td>{team.teamName}</td>
                         <td>{memberCount}</td>
                         <td>{team.leaderName || team.leader || "—"}</td>
-
-                        {/* STATUS */}
                         <td>
                           <span
                             className={
                               team.status === "Dispatched"
                                 ? styles.statusDispatched
                                 : team.status === "Unavailable"
-                                ? styles.statusUnavailable
-                                : styles.statusAvailable
+                                  ? styles.statusUnavailable
+                                  : styles.statusAvailable
                             }
                           >
                             {team.status}
@@ -595,14 +640,31 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
                         <td>
                           <button
                             onClick={() => openEditTeam(team)}
-                            style={{ marginRight: 8, padding: "6px 10px", borderRadius: 6, border: "none", background: "#f0ad4e", color: "#fff", cursor: "pointer" }}
+                            style={{
+                              marginRight: 8,
+                              padding: "6px 10px",
+                              borderRadius: 6,
+                              border: "none",
+                              background: "#f0ad4e",
+                              color: "#fff",
+                              cursor: "pointer",
+                            }}
                           >
                             Edit
                           </button>
 
                           <button
-                            onClick={() => setConfirmDelete({ type: "team", id: team.id })}
-                            style={{ padding: "6px 10px", borderRadius: 6, border: "none", background: "#dc3545", color: "#fff", cursor: "pointer" }}
+                            onClick={() =>
+                              setConfirmDelete({ type: "team", id: team.id })
+                            }
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: 6,
+                              border: "none",
+                              background: "#dc3545",
+                              color: "#fff",
+                              cursor: "pointer",
+                            }}
                           >
                             Delete
                           </button>
@@ -615,19 +677,34 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
             </>
           )}
 
-          {/* VEHICLES */}
           {activeTab === "vehicles" && (
             <>
-              <div className={styles.headerRow} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div
+                className={styles.headerRow}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
                 <h3 className={styles.subTitle}>Vehicles</h3>
                 <div>
-                  <button className={styles.addBtn} onClick={() => { setShowAddVehicleModal(true); setEditingVehicle(null); }}>
+                  <button
+                    className={styles.addBtn}
+                    onClick={() => {
+                      setShowAddVehicleModal(true);
+                      setEditingVehicle(null);
+                    }}
+                  >
                     + Add Truck
                   </button>
                 </div>
               </div>
 
-              <table className={styles.dataTable} style={{ width: "100%", borderCollapse: "collapse" }}>
+              <table
+                className={styles.dataTable}
+                style={{ width: "100%", borderCollapse: "collapse" }}
+              >
                 <thead>
                   <tr>
                     <th>Vehicle Code</th>
@@ -643,7 +720,12 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
                     <tr key={v.id}>
                       <td>{v.code}</td>
                       <td>{v.plate}</td>
-                      <td>{v.assignedTeam || (teams.find((t) => t.id === v.assignedTeamId)?.teamName || "—")}</td>
+                      <td>
+                        {v.assignedTeam ||
+                          teams.find((t) => t.id === v.assignedTeamId)
+                            ?.teamName ||
+                          "—"}
+                      </td>
 
                       <td>
                         <span
@@ -651,8 +733,8 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
                             v.status === "Dispatched"
                               ? styles.statusDispatched
                               : v.status === "Unavailable"
-                              ? styles.statusUnavailable
-                              : styles.statusAvailable
+                                ? styles.statusUnavailable
+                                : styles.statusAvailable
                           }
                         >
                           {v.status}
@@ -662,14 +744,31 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
                       <td>
                         <button
                           onClick={() => openEditVehicle(v)}
-                          style={{ marginRight: 8, padding: "6px 10px", borderRadius: 6, border: "none", background: "#f0ad4e", color: "#fff", cursor: "pointer" }}
+                          style={{
+                            marginRight: 8,
+                            padding: "6px 10px",
+                            borderRadius: 6,
+                            border: "none",
+                            background: "#f0ad4e",
+                            color: "#fff",
+                            cursor: "pointer",
+                          }}
                         >
                           Edit
                         </button>
 
                         <button
-                          onClick={() => setConfirmDelete({ type: "vehicle", id: v.id })}
-                          style={{ padding: "6px 10px", borderRadius: 6, border: "none", background: "#dc3545", color: "#fff", cursor: "pointer" }}
+                          onClick={() =>
+                            setConfirmDelete({ type: "vehicle", id: v.id })
+                          }
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 6,
+                            border: "none",
+                            background: "#dc3545",
+                            color: "#fff",
+                            cursor: "pointer",
+                          }}
                         >
                           Delete
                         </button>
@@ -690,23 +789,38 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
             <h3 className={styles.modalTitle}>Add Team</h3>
 
             <label className={styles.label}>Team Name</label>
-            <input className={styles.input} type="text" placeholder="Enter team name" value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} />
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="Enter team name"
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+            />
 
             <label className={styles.label}>Team Leader</label>
-            <select className={styles.input} value={selectedLeader} onChange={(e) => setSelectedLeader(e.target.value)}>
+            <select
+              className={styles.input}
+              value={selectedLeader}
+              onChange={(e) => setSelectedLeader(e.target.value)}
+            >
               <option value="">Select Leader</option>
-              {responders.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
+              {responders
+                .filter((r) => !teams.some((t) => t.leaderId === r.id))
+                .map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
             </select>
 
             <div className={styles.modalActions}>
               <button className={styles.saveBtn} onClick={createTeam}>
                 Create Team
               </button>
-              <button className={styles.closeBtn} onClick={() => setShowAddTeamModal(false)}>
+              <button
+                className={styles.closeBtn}
+                onClick={() => setShowAddTeamModal(false)}
+              >
                 Cancel
               </button>
             </div>
@@ -725,21 +839,51 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
               className={styles.input}
               type="text"
               value={editingTeam.teamName}
-              onChange={(e) => setEditingTeam((s: any) => ({ ...s, teamName: e.target.value }))}
+              onChange={(e) =>
+                setEditingTeam((s: any) => ({
+                  ...s,
+                  teamName: e.target.value,
+                }))
+              }
             />
 
             <label className={styles.label}>Team Leader</label>
-            <select className={styles.input} value={editingTeam.leaderId} onChange={(e) => setEditingTeam((s: any) => ({ ...s, leaderId: e.target.value }))}>
+            <select
+              className={styles.input}
+              value={editingTeam.leaderId}
+              onChange={(e) =>
+                setEditingTeam((s: any) => ({
+                  ...s,
+                  leaderId: e.target.value,
+                }))
+              }
+            >
               <option value="">Select Leader</option>
-              {responders.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
+              {responders
+                .filter(
+                  (r) =>
+                    !teams.some(
+                      (t) => t.leaderId === r.id && t.id !== editingTeam.id,
+                    ),
+                )
+                .map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
             </select>
 
             <label className={styles.label}>Status</label>
-            <select className={styles.input} value={editingTeam.status} onChange={(e) => setEditingTeam((s: any) => ({ ...s, status: e.target.value }))}>
+            <select
+              className={styles.input}
+              value={editingTeam.status}
+              onChange={(e) =>
+                setEditingTeam((s: any) => ({
+                  ...s,
+                  status: e.target.value,
+                }))
+              }
+            >
               <option value="Available">Available</option>
               <option value="Dispatched">Dispatched</option>
               <option value="Unavailable">Unavailable</option>
@@ -749,7 +893,10 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
               <button className={styles.saveBtn} onClick={saveEditTeam}>
                 Save Changes
               </button>
-              <button className={styles.closeBtn} onClick={() => setEditingTeam(null)}>
+              <button
+                className={styles.closeBtn}
+                onClick={() => setEditingTeam(null)}
+              >
                 Cancel
               </button>
             </div>
@@ -764,13 +911,29 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
             <h3 className={styles.modalTitle}>Add Vehicle</h3>
 
             <label className={styles.label}>Vehicle Code</label>
-            <input className={styles.input} type="text" placeholder="Enter vehicle code" value={vehicleCode} onChange={(e) => setVehicleCode(e.target.value)} />
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="Enter vehicle code"
+              value={vehicleCode}
+              onChange={(e) => setVehicleCode(e.target.value)}
+            />
 
             <label className={styles.label}>Plate Number</label>
-            <input className={styles.input} type="text" placeholder="Enter plate number" value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value)} />
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="Enter plate number"
+              value={vehiclePlate}
+              onChange={(e) => setVehiclePlate(e.target.value)}
+            />
 
             <label className={styles.label}>Team Assigned</label>
-            <select className={styles.input} value={vehicleTeam} onChange={(e) => setVehicleTeam(e.target.value)}>
+            <select
+              className={styles.input}
+              value={vehicleTeam}
+              onChange={(e) => setVehicleTeam(e.target.value)}
+            >
               <option value="">Select Team</option>
               {teams.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -783,7 +946,10 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
               <button className={styles.saveBtn} onClick={createVehicle}>
                 Add Vehicle
               </button>
-              <button className={styles.closeBtn} onClick={() => setShowAddVehicleModal(false)}>
+              <button
+                className={styles.closeBtn}
+                onClick={() => setShowAddVehicleModal(false)}
+              >
                 Cancel
               </button>
             </div>
@@ -798,13 +964,42 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
             <h3 className={styles.modalTitle}>Edit Vehicle</h3>
 
             <label className={styles.label}>Vehicle Code</label>
-            <input className={styles.input} type="text" value={editingVehicle.code} onChange={(e) => setEditingVehicle((s: any) => ({ ...s, code: e.target.value }))} />
+            <input
+              className={styles.input}
+              type="text"
+              value={editingVehicle.code}
+              onChange={(e) =>
+                setEditingVehicle((s: any) => ({
+                  ...s,
+                  code: e.target.value,
+                }))
+              }
+            />
 
             <label className={styles.label}>Plate Number</label>
-            <input className={styles.input} type="text" value={editingVehicle.plate} onChange={(e) => setEditingVehicle((s: any) => ({ ...s, plate: e.target.value }))} />
+            <input
+              className={styles.input}
+              type="text"
+              value={editingVehicle.plate}
+              onChange={(e) =>
+                setEditingVehicle((s: any) => ({
+                  ...s,
+                  plate: e.target.value,
+                }))
+              }
+            />
 
             <label className={styles.label}>Assign to Team</label>
-            <select className={styles.input} value={editingVehicle.assignedTeamId} onChange={(e) => setEditingVehicle((s: any) => ({ ...s, assignedTeamId: e.target.value }))}>
+            <select
+              className={styles.input}
+              value={editingVehicle.assignedTeamId}
+              onChange={(e) =>
+                setEditingVehicle((s: any) => ({
+                  ...s,
+                  assignedTeamId: e.target.value,
+                }))
+              }
+            >
               <option value="">No team</option>
               {teams.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -814,7 +1009,16 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
             </select>
 
             <label className={styles.label}>Status</label>
-            <select className={styles.input} value={editingVehicle.status} onChange={(e) => setEditingVehicle((s: any) => ({ ...s, status: e.target.value }))}>
+            <select
+              className={styles.input}
+              value={editingVehicle.status}
+              onChange={(e) =>
+                setEditingVehicle((s: any) => ({
+                  ...s,
+                  status: e.target.value,
+                }))
+              }
+            >
               <option value="Available">Available</option>
               <option value="Dispatched">Dispatched</option>
               <option value="Unavailable">Unavailable</option>
@@ -824,100 +1028,100 @@ const [errorMessage, setErrorMessage] = useState<string | null>(null);
               <button className={styles.saveBtn} onClick={saveEditVehicle}>
                 Save Changes
               </button>
-              <button className={styles.closeBtn} onClick={() => setEditingVehicle(null)}>
+              <button
+                className={styles.closeBtn}
+                onClick={() => setEditingVehicle(null)}
+              >
                 Cancel
               </button>
             </div>
           </div>
-          
         </div>
-
-        
       )}
+
       {/* CONFIRM DELETE MODAL */}
-{confirmDelete && (
+      {confirmDelete && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h3 className={styles.modalTitle}>Confirm Delete</h3>
 
-  <div className={styles.modalOverlay}>
-    <div className={styles.modalContent}>
-      <h3 className={styles.modalTitle}>Confirm Delete</h3>
+            <p
+              style={{ marginBottom: 20, textAlign: "center", color: "black" }}
+            >
+              Are you sure you want to delete this{" "}
+              <b>{confirmDelete.type === "team" ? "Team" : "Vehicle"}</b>? This
+              action cannot be undone.
+            </p>
 
-  <p style={{ marginBottom: 20, textAlign: "center", color: "black" }}>
-    Are you sure you want to delete this{" "}
-    <b>{confirmDelete.type === "team" ? "Team" : "Vehicle"}</b>?
+            <div className={styles.modalActions}>
+              <button
+                className={styles.saveBtn}
+                style={{ background: "#dc3545" }}
+                onClick={handleConfirmDelete}
+              >
+                Yes, Delete
+              </button>
 
-    This action cannot be undone.
-  </p>
+              <button
+                className={styles.closeBtn}
+                onClick={() => setConfirmDelete(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-  <div className={styles.modalActions}>
-    <button
-      className={styles.saveBtn}
-      style={{ background: "#dc3545" }}
-      onClick={handleConfirmDelete}
-    >
-      Yes, Delete
-    </button>
+      {/* SUCCESS MODAL */}
+      {successMessage && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h3 className={styles.modalTitle}>Success</h3>
 
-    <button
-      className={styles.closeBtn}
-      onClick={() => setConfirmDelete(null)}
-    >
-      Cancel
-    </button>
-  </div>
-</div>
+            <p
+              style={{ marginBottom: 20, textAlign: "center", color: "black" }}
+            >
+              {successMessage}
+            </p>
 
+            <div className={styles.modalActions}>
+              <div className={styles.okayBtnWrapper}>
+                <button
+                  className={styles.okayBtn}
+                  onClick={() => setSuccessMessage(null)}
+                >
+                  <span>Okay</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-  </div>
-  
-)}
-{/* SUCCESS MODAL */}
-{successMessage && (
+      {/* ERROR MODAL */}
+      {errorMessage && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h3 className={styles.modalTitle}>Error</h3>
 
-  <div className={styles.modalOverlay}>
-    <div className={styles.modalContent}>
-      <h3 className={styles.modalTitle}>Success</h3>
+            <p
+              style={{ marginBottom: 20, textAlign: "center", color: "black" }}
+            >
+              {errorMessage}
+            </p>
 
-  <p style={{ marginBottom: 20, textAlign: "center", color: "black" }}>
-    {successMessage}
-  </p>
-
-  <div className={styles.modalActions}>
-    <button
-      className={styles.saveBtn}
-      onClick={() => setSuccessMessage(null)}
-    >
-      Okay
-    </button>
-  </div>
-</div>
-
-
-  </div>
-
-  
-)}
-{errorMessage && (
-  <div className={styles.modalOverlay}>
-    <div className={styles.modalContent}>
-      <h3 className={styles.modalTitle}>Error</h3>
-
-      <p style={{ marginBottom: 20, textAlign: "center", color: "black" }}>
-        {errorMessage}
-      </p>
-
-      <div className={styles.modalActions}>
-        <button
-          className={styles.closeBtn}
-          onClick={() => setErrorMessage(null)}
-        >
-          Okay
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-
+            <div className={styles.modalActions}>
+              <button
+                className={styles.closeBtn}
+                onClick={() => setErrorMessage(null)}
+              >
+                Okay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

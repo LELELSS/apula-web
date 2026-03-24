@@ -33,18 +33,57 @@
   border-top: 1px solid #ddd;
 }
 
+/* BUTTONS */
 .addBtn,
 .assignBtn,
 .saveBtn,
 .closeBtn,
 .deleteBtn,
 .editBtn,
-.removeBtn {
-  border: none;
-  border-radius: 8px;
+.removeBtn,
+.mapSearchBtn,
+.okayBtn {
+  border-radius: 10px;
   padding: 10px 14px;
   cursor: pointer;
   font-weight: 600;
+  position: relative;
+  overflow: hidden;
+  transition: color 0.3s ease;
+  z-index: 1;
+}
+
+.addBtn::before,
+.assignBtn::before,
+.saveBtn::before,
+.closeBtn::before,
+.deleteBtn::before,
+.editBtn::before,
+.removeBtn::before,
+.mapSearchBtn::before,
+.okayBtn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: white;
+  transition: left 0.35s ease;
+  z-index: 0;
+}
+
+.addBtn span,
+.assignBtn span,
+.saveBtn span,
+.closeBtn span,
+.deleteBtn span,
+.editBtn span,
+.removeBtn span,
+.mapSearchBtn span,
+.okayBtn span {
+  position: relative;
+  z-index: 1;
 }
 
 .addBtn,
@@ -52,54 +91,105 @@
 .saveBtn {
   background: #8b0000;
   color: #fff;
+  border: 2px solid #8b0000;
+}
+
+.addBtn:hover::before,
+.assignBtn:hover::before,
+.saveBtn:hover::before {
+  left: 0;
 }
 
 .addBtn:hover,
 .assignBtn:hover,
 .saveBtn:hover {
-  background: #690000;
+  color: #8b0000;
 }
 
 .closeBtn {
-  background: #555;
+  background: #8b0000;
   color: #fff;
+  border: 2px solid #8b0000;
+}
+
+.closeBtn:hover::before {
+  left: 0;
 }
 
 .closeBtn:hover {
-  background: #333;
+  color: #8b0000;
 }
 
 .deleteBtn {
   background: #dc2626;
   color: #fff;
+  border: 2px solid #dc2626;
+}
+
+.deleteBtn:hover::before {
+  left: 0;
 }
 
 .deleteBtn:hover {
-  background: #b91c1c;
+  color: #dc2626;
 }
 
 .editBtn {
   background: #2563eb;
   color: #fff;
+  border: 2px solid #2563eb;
+}
+
+.editBtn:hover::before {
+  left: 0;
 }
 
 .editBtn:hover {
-  background: #1d4ed8;
+  color: #2563eb;
 }
 
 .removeBtn {
   background: #f97316;
   color: #fff;
+  border: 2px solid #f97316;
   padding: 8px 12px;
 }
 
-.removeBtn:hover {
-  background: #ea580c;
+.removeBtn:hover::before {
+  left: 0;
 }
 
+.removeBtn:hover {
+  color: #f97316;
+}
+
+.mapSearchBtn {
+  background: #2563eb;
+  color: #fff;
+  border: 2px solid #2563eb;
+}
+
+.mapSearchBtn:hover::before {
+  left: 0;
+}
+
+.mapSearchBtn:hover {
+  color: #2563eb;
+}
+
+.mapSearchBtn:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.mapSearchBtn:disabled::before {
+  display: none;
+}
+
+/* CARDS */
 .assignCard {
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 14px;
   margin-bottom: 18px;
   background: #f8fafc;
@@ -118,14 +208,25 @@
   margin-bottom: 10px;
 }
 
+/* INPUTS */
 .input {
   width: 100%;
   box-sizing: border-box;
   padding: 10px 12px;
   border: 1px solid #ccc;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 0.95rem;
   background: #fff;
+  color: #111;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.input:focus {
+  border-color: #a30000;
+  box-shadow: 0 0 0 3px rgba(163, 0, 0, 0.1);
 }
 
 .addressRow {
@@ -133,25 +234,6 @@
   grid-template-columns: 1fr auto;
   gap: 10px;
   align-items: start;
-}
-
-.mapSearchBtn {
-  border: none;
-  border-radius: 8px;
-  padding: 10px 14px;
-  cursor: pointer;
-  font-weight: 600;
-  background: #2563eb;
-  color: #fff;
-}
-
-.mapSearchBtn:hover {
-  background: #1d4ed8;
-}
-
-.mapSearchBtn:disabled {
-  cursor: wait;
-  opacity: 0.7;
 }
 
 .mapWrap {
@@ -174,6 +256,7 @@
   line-height: 1.4;
 }
 
+/* TABLE */
 .tableWrap {
   overflow-x: auto;
 }
@@ -208,10 +291,12 @@
   color: #555;
 }
 
+/* MODAL */
 .modalOverlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -221,21 +306,35 @@
 
 .modalContent {
   width: 100%;
-  max-width: 420px;
+  max-width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
   background: #fff;
-  border-radius: 12px;
-  padding: 18px;
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+  animation: fadeInScale 0.25s ease;
+}
+
+.addStationModal {
+  max-width: 960px;
+  width: 90%;
 }
 
 .modalTitle {
-  margin: 0 0 12px;
-  color: #800000;
+  margin: 0 0 14px;
+  color: #a30000;
   font-weight: 700;
+  font-size: 1.45rem;
+  text-align: center;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #a30000;
 }
 
 .label {
   display: block;
   margin-bottom: 6px;
+  margin-top: 12px;
   color: #444;
   font-weight: 600;
 }
@@ -243,7 +342,7 @@
 .assignedList {
   margin-top: 6px;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 10px;
   max-height: 180px;
   overflow-y: auto;
@@ -267,9 +366,44 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
 }
 
+/* CENTERED OKAY BUTTON */
+.okayBtnWrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 22px;
+}
+
+.okayBtn {
+  background: #a30000;
+  color: white;
+  border: 2px solid #a30000;
+  padding: 12px 28px;
+  border-radius: 12px;
+  min-width: 180px;
+}
+
+.okayBtn:hover::before {
+  left: 0;
+}
+
+.okayBtn:hover {
+  color: #a30000;
+}
+
+/* OPTIONAL MESSAGE TEXT */
+.statusMessage {
+  margin-top: 8px;
+  color: #374151;
+  line-height: 1.5;
+  text-align: center;
+  font-size: 0.97rem;
+}
+
+/* TOAST FEEDBACK */
 .feedbackSuccess,
 .feedbackError {
   position: fixed;
@@ -308,8 +442,46 @@
   }
 }
 
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @media (max-width: 640px) {
+  .container {
+    padding: 14px;
+  }
+
+  .contentSection {
+    padding: 14px;
+  }
+
+  .headerRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .addressRow {
     grid-template-columns: 1fr;
+  }
+
+  .modalContent {
+    max-width: 100%;
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  .modalActions {
+    flex-direction: column;
+  }
+
+  .actionRow {
+    flex-direction: column;
   }
 }

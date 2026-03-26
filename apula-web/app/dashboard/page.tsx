@@ -84,19 +84,18 @@ const AdminDashboard = () => {
 
   /* ================= ACTIVE FIRE ALERTS ================= */
   useEffect(() => {
-    const q = query(
-      collection(db, "alerts"),
-      where("status", "!=", "Resolved")
-    );
+  const q = query(
+    collection(db, "alerts"),
+    where("status", "not-in", ["Resolved", "Confirmed"])
+  );
 
-    const unsub = onSnapshot(q, (snap) => {
-      setActiveAlertCount(snap.size);
-      setDataLoadCount(prev => prev + 1);
-    });
+  const unsub = onSnapshot(q, (snap) => {
+    setActiveAlertCount(snap.size);
+    setDataLoadCount((prev) => prev + 1);
+  });
 
-    return () => unsub();
-  }, []);
-
+  return () => unsub();
+}, []);
   /* ================= RESPONDERS ================= */
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "users"), (snap) => {

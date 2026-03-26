@@ -446,7 +446,7 @@ const AdminDashboard = () => {
                 <FaCheckCircle className={styles.cardIcon} />
                 <p className={styles.bigNumber}>{resolvedTodayCount}</p>
               </div>
-              <span className={styles.cardLabel}>Resolved Fire Incidents (Today)</span>
+              <span className={styles.cardLabel}>Confirmed Fire Incidents (Today)</span>
             </div>
           </div>
 

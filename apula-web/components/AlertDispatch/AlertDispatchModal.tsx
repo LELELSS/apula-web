@@ -22,47 +22,6 @@ import { logActivity } from "@/lib/activityLog";
 
 const normalizeStatus = (value: unknown) => String(value || "").trim().toLowerCase();
 
-const isOpenBackupRequest = (data: Record<string, unknown>) => {
-  const status =
-    normalizeStatus(data.status) ||
-    normalizeStatus(data.requestStatus) ||
-    normalizeStatus(data.backupStatus) ||
-    normalizeStatus(data.dispatchStatus);
-
-  if (
-    status === "resolved" ||
-    status === "closed" ||
-    status === "completed" ||
-    status === "done" ||
-    status === "approved" ||
-    status === "dispatched" ||
-    status === "accepted" ||
-    status === "declined" ||
-    status === "cancelled" ||
-    status === "canceled"
-  ) {
-    return false;
-  }
-
-  if (
-    status === "pending" ||
-    status === "active" ||
-    status === "open" ||
-    status === "requested" ||
-    status === "waiting" ||
-    status === "new"
-  ) {
-    return true;
-  }
-
-  if (typeof data.resolved === "boolean") return !data.resolved;
-  if (typeof data.isResolved === "boolean") return !data.isResolved;
-  if (typeof data.completed === "boolean") return !data.completed;
-  if (typeof data.isCompleted === "boolean") return !data.isCompleted;
-
-  return true;
-};
-
 const timestampToMillis = (value: any) => {
   if (!value) return 0;
   if (typeof value?.toMillis === "function") return value.toMillis();
@@ -90,30 +49,23 @@ const hasValidCoordinates = (lat: number | null, lng: number | null) => (
   Math.abs(lng) <= 180
 );
 
-const normalizeIncident = (id: string, data: any, source: "alerts" | "backup_requests") => {
+const normalizeIncident = (id: string, data: any) => {
   const type =
     data?.type ||
     data?.alertType ||
-    data?.requestType ||
-    data?.backupType ||
-    (source === "backup_requests" ? "Backup Request" : "Fire Alert");
+    "Fire Alert";
 
   const userName =
     data?.userName ||
-    data?.requestedByName ||
     data?.reportedBy ||
-    data?.requestedBy ||
-    data?.requesterName ||
     data?.name ||
     "Unknown";
 
   const userContact =
     data?.userContact ||
-    data?.requestedByEmail ||
     data?.contact ||
     data?.phone ||
     data?.mobile ||
-    data?.requesterContact ||
     "";
 
   const userAddress =
@@ -121,9 +73,6 @@ const normalizeIncident = (id: string, data: any, source: "alerts" | "backup_req
     data?.location ||
     data?.alertLocation ||
     data?.address ||
-    data?.requestAddress ||
-    data?.stationAddress ||
-    data?.stationName ||
     "";
 
   const location =
@@ -131,29 +80,19 @@ const normalizeIncident = (id: string, data: any, source: "alerts" | "backup_req
     data?.alertLocation ||
     data?.userAddress ||
     data?.address ||
-    data?.requestAddress ||
     userAddress;
 
   return {
     id,
     ...data,
-    __source: source,
-    __isBackupRequest: source === "backup_requests",
-    __baseAlertId: source === "backup_requests" ? String(data?.alertId || "") : id,
     type,
     userName,
     userContact,
     userAddress,
     location,
-    status:
-      data?.status ||
-      data?.requestStatus ||
-      data?.backupStatus ||
-      data?.dispatchStatus ||
-      (source === "backup_requests" ? "Pending" : data?.status),
+    status: data?.status || "Pending",
     timestamp:
       data?.timestamp ||
-      data?.requestedAt ||
       data?.createdAt ||
       data?.updatedAt ||
       null,
@@ -162,7 +101,7 @@ const normalizeIncident = (id: string, data: any, source: "alerts" | "backup_req
 
 const AlertDispatchModal = () => {
   const [showModal, setShowModal] = useState(false);
-  const [activeIncidentTab, setActiveIncidentTab] = useState<"all" | "alerts" | "backup">("all");
+  const [activeIncidentTab, setActiveIncidentTab] = useState<"all" | "alerts" | "confirmation">("all");
 
   const [dispatchStep, setDispatchStep] = useState<1 | 2 | 3>(1);
 
@@ -193,7 +132,9 @@ const AlertDispatchModal = () => {
 
 
   const [showDispatchSuccessModal, setShowDispatchSuccessModal] = useState(false);
-const [dispatchSuccessMessage, setDispatchSuccessMessage] = useState("");
+  const [dispatchSuccessMessage, setDispatchSuccessMessage] = useState("");
+  const [showConfirmSuccessModal, setShowConfirmSuccessModal] = useState(false);
+  const [confirmSuccessMessage, setConfirmSuccessMessage] = useState("");
 
   const extractGoogleDriveFileId = (url: string): string | null => {
     const filePathMatch = url.match(/\/file\/d\/([^/]+)/);
@@ -399,115 +340,17 @@ const [dispatchSuccessMessage, setDispatchSuccessMessage] = useState("");
   // LOAD PENDING ALERTS
   // ------------------------------------------------------------
   const loadAlerts = async () => {
-    const [alertSnap, backupSnap] = await Promise.all([
-      getDocs(
-        query(
-          collection(db, "alerts"),
-          where("status", "==", "Pending"),
-          orderBy("timestamp", "desc")
-        )
-      ),
-      getDocs(collection(db, "backup_requests")),
-    ]);
+    const alertSnap = await getDocs(
+      query(collection(db, "alerts"), orderBy("timestamp", "desc"))
+    );
 
-    const alertMap = new Map<string, any>();
-    alertSnap.docs.forEach((docSnap) => {
-      alertMap.set(docSnap.id, docSnap.data());
-    });
-
-    const dispatchIds = new Set<string>();
-    backupSnap.docs.forEach((docSnap) => {
-      const data = docSnap.data() as any;
-      if (typeof data?.sourceDispatchId === "string" && data.sourceDispatchId.trim()) {
-        dispatchIds.add(data.sourceDispatchId.trim());
-      }
-      if (typeof data?.approvedDispatchId === "string" && data.approvedDispatchId.trim()) {
-        dispatchIds.add(data.approvedDispatchId.trim());
-      }
-    });
-
-    const dispatchDocs: Array<[string, any] | null> = await Promise.all(
-      Array.from(dispatchIds).map(async (dispatchId) => {
-        const docSnap = await getDoc(doc(db, "dispatches", dispatchId));
-        return docSnap.exists() ? [dispatchId, docSnap.data()] : null;
+    const nextAlerts = alertSnap.docs
+      .map((d) => normalizeIncident(d.id, d.data()))
+      .filter((item) => {
+        const status = normalizeStatus(item.status);
+        return status === "pending" || status === "dispatched" || status === "validated";
       })
-    );
-
-    const dispatchMap = new Map<string, any>();
-    dispatchDocs.forEach((entry) => {
-      if (entry) {
-        dispatchMap.set(entry[0], entry[1]);
-      }
-    });
-
-    const pendingAlerts = alertSnap.docs.map((d) =>
-      normalizeIncident(d.id, d.data(), "alerts")
-    );
-
-    const pendingBackupRequests = backupSnap.docs
-      .map((d) => {
-        const backupData = d.data() as any;
-        const linkedAlert = backupData?.alertId ? alertMap.get(String(backupData.alertId)) || {} : {};
-        const linkedDispatch =
-          dispatchMap.get(String(backupData?.sourceDispatchId || "")) ||
-          dispatchMap.get(String(backupData?.approvedDispatchId || "")) ||
-          {};
-
-        return normalizeIncident(
-          d.id,
-          {
-            ...linkedDispatch,
-            ...linkedAlert,
-            ...backupData,
-            userName: backupData?.requestedByName || linkedAlert?.userName || linkedDispatch?.userReported,
-            userContact:
-              backupData?.requestedByEmail ||
-              linkedAlert?.userContact ||
-              linkedDispatch?.userContact ||
-              linkedAlert?.userEmail ||
-              linkedDispatch?.userEmail ||
-              "",
-            userEmail:
-              backupData?.requestedByEmail ||
-              linkedAlert?.userEmail ||
-              linkedDispatch?.userEmail ||
-              "",
-            userAddress:
-              linkedAlert?.userAddress ||
-              linkedDispatch?.userAddress ||
-              linkedAlert?.location ||
-              linkedDispatch?.alertLocation ||
-              backupData?.stationName ||
-              backupData?.address ||
-              "",
-            location:
-              linkedAlert?.location ||
-              linkedDispatch?.alertLocation ||
-              linkedAlert?.userAddress ||
-              linkedDispatch?.userAddress ||
-              backupData?.stationName ||
-              "",
-            latitude:
-              linkedAlert?.latitude ??
-              linkedAlert?.lat ??
-              linkedDispatch?.latitude ??
-              linkedDispatch?.lat,
-            longitude:
-              linkedAlert?.longitude ??
-              linkedAlert?.lng ??
-              linkedAlert?.lon ??
-              linkedDispatch?.longitude ??
-              linkedDispatch?.lng ??
-              linkedDispatch?.lon,
-          },
-          "backup_requests"
-        );
-      })
-      .filter((item) => isOpenBackupRequest(item as Record<string, unknown>));
-
-    const nextAlerts = [...pendingBackupRequests, ...pendingAlerts].sort(
-      (a, b) => timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp)
-    );
+      .sort((a, b) => timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp));
 
     setAlerts(nextAlerts);
   };
@@ -682,7 +525,7 @@ const [dispatchSuccessMessage, setDispatchSuccessMessage] = useState("");
         return;
       }
 
-      const baseAlertId = String(selectedAlert.__baseAlertId || selectedAlert.alertId || selectedAlert.id || "").trim();
+      const baseAlertId = String(selectedAlert.id || "").trim();
       if (!baseAlertId) {
         setAlreadyDispatchedTeams(new Set());
         return;
@@ -883,15 +726,122 @@ const sortedGroupedList = [...groupedList].sort((a: any, b: any) => {
 
   const incidentCounts = {
     all: alerts.length,
-    alerts: alerts.filter((item) => !item.__isBackupRequest).length,
-    backup: alerts.filter((item) => item.__isBackupRequest).length,
+    alerts: alerts.filter((item) => normalizeStatus(item.status) !== "validated").length,
+    confirmation: alerts.filter((item) => normalizeStatus(item.status) === "validated").length,
   };
 
   const visibleIncidents = alerts.filter((item) => {
-    if (activeIncidentTab === "alerts") return !item.__isBackupRequest;
-    if (activeIncidentTab === "backup") return item.__isBackupRequest;
+    const status = normalizeStatus(item.status);
+    if (activeIncidentTab === "alerts") return status !== "validated";
+    if (activeIncidentTab === "confirmation") return status === "validated";
     return true;
   });
+
+
+
+  const confirmIncident = async (alertItem: any) => {
+    try {
+      const currentUser = auth.currentUser;
+      let confirmerName = "Admin Panel";
+
+      if (currentUser) {
+        try {
+          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            confirmerName =
+              data.name || currentUser.displayName || currentUser.email || "Admin Panel";
+          } else {
+            confirmerName =
+              currentUser.displayName || currentUser.email || "Admin Panel";
+          }
+        } catch {
+          confirmerName = currentUser.displayName || currentUser.email || "Admin Panel";
+        }
+      }
+
+      await updateDoc(doc(db, "alerts", alertItem.id), {
+        status: "Confirmed",
+        confirmationStatus: "Confirmed",
+        confirmedAt: serverTimestamp(),
+        confirmedBy: confirmerName,
+      });
+
+      const dispatchSnap = await getDocs(
+        query(collection(db, "dispatches"), where("alertId", "==", alertItem.id))
+      );
+
+      if (!dispatchSnap.empty) {
+        const batch = writeBatch(db);
+
+        dispatchSnap.docs.forEach((dispatchDoc) => {
+          batch.update(dispatchDoc.ref, {
+            status: "Confirmed",
+            confirmationStatus: "Confirmed",
+            confirmedAt: serverTimestamp(),
+            confirmedBy: confirmerName,
+          });
+        });
+
+        await batch.commit();
+      }
+
+      await addDoc(collection(db, "notifications"), {
+        type: "Incident Confirmation",
+        status: "Confirmed",
+        message: `Incident has been confirmed by ${confirmerName}.`,
+        alertId: alertItem.id,
+        location:
+          alertItem.userAddress ||
+          alertItem.alertLocation ||
+          alertItem.location ||
+          "",
+        userName: alertItem.userName || "System",
+        userAddress:
+          alertItem.userAddress ||
+          alertItem.alertLocation ||
+          alertItem.location ||
+          "",
+        userContact: alertItem.userContact || "",
+        userEmail: alertItem.userEmail || "",
+        readBy: [],
+        timestamp: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      });
+
+      if (currentUser) {
+        await logActivity({
+          actorUid: currentUser.uid,
+          actorEmail: currentUser.email || "",
+          actorName: confirmerName,
+          actorRole: "admin",
+          action: "confirm_incident",
+          targetId: String(alertItem.id),
+          targetType: "alert",
+          details: "Confirmed validated incident.",
+          path: "/dashboard/dispatch",
+        });
+      }
+
+      await loadAlerts();
+      setConfirmSuccessMessage(
+        `Fire incident at ${
+          alertItem.userAddress ||
+          alertItem.alertLocation ||
+          alertItem.location ||
+          "the selected fire address"
+        } has been confirmed successfully.`
+      );
+      setShowConfirmSuccessModal(true);
+
+      setTimeout(() => {
+        setShowConfirmSuccessModal(false);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to confirm incident:", error);
+      alert("Failed to confirm incident.");
+    }
+  };
 
 const getTeamStationName = (teamName: string) => {
   const team = teams.find((t) => t.teamName === teamName);
@@ -955,7 +905,7 @@ const getTeamStationName = (teamName: string) => {
     };
 
     try {
-      const baseAlertId = selectedAlert.__baseAlertId || selectedAlert.alertId || selectedAlert.id;
+      const baseAlertId = selectedAlert.id;
       const currentUser = auth.currentUser;
       const dispatchedByName = await getDispatcherName();
 
@@ -965,15 +915,14 @@ const getTeamStationName = (teamName: string) => {
       const ref = doc(collection(db, "dispatches"));
 
       batch.set(ref, {
-        alertId: selectedAlert.__baseAlertId || selectedAlert.alertId || selectedAlert.id,
-        backupRequestId: selectedAlert.__isBackupRequest ? selectedAlert.id : "",
+        alertId: selectedAlert.id,
         alertType: selectedAlert.type,
         alertLocation: selectedAlert.location,
         snapshotUrl: selectedAlert.snapshotUrl || null,
         snapshotBase64: selectedAlert.snapshotBase64 || null,
-        dispatchType: selectedAlert.__isBackupRequest ? "Backup" : "Primary",
-        isBackup: Boolean(selectedAlert.__isBackupRequest),
-        requestSource: selectedAlert.__source || "alerts",
+        dispatchType: "Primary",
+        isBackup: false,
+        requestSource: "alerts",
 
         responders: selected.map((r) => {
           const teamName =
@@ -1010,18 +959,11 @@ const getTeamStationName = (teamName: string) => {
       );
 
       // Update alert → Dispatched
-      batch.update(
-        doc(
-          db,
-          selectedAlert.__source === "backup_requests" ? "backup_requests" : "alerts",
-          selectedAlert.id
-        ),
-        {
+      batch.update(doc(db, "alerts", selectedAlert.id), {
         status: "Dispatched",
         dispatchStatus: "Dispatched",
         respondedAt: serverTimestamp(),
-        }
-      );
+      });
 
       // ------------------------------------------------------------
       // 🚒 UPDATE TEAM + VEHICLE STATUS ON DISPATCH
@@ -1095,7 +1037,10 @@ const getTeamStationName = (teamName: string) => {
 
       setDispatchSuccessMessage(
         `Successfully dispatched ${dispatchedTeamNames.join(", ")} to ${
-          selectedAlert.location || selectedAlert.userAddress || "the selected incident"
+          selectedAlert.userAddress ||
+          selectedAlert.alertLocation ||
+          selectedAlert.location ||
+          "the selected fire address"
         }.`
       );
 
@@ -1210,16 +1155,16 @@ setTimeout(() => {
                 Alerts ({incidentCounts.alerts})
               </button>
               <button
-                className={`${styles.modalTabBtn} ${activeIncidentTab === "backup" ? styles.modalTabBtnActive : ""}`}
-                onClick={() => setActiveIncidentTab("backup")}
+                className={`${styles.modalTabBtn} ${activeIncidentTab === "confirmation" ? styles.modalTabBtnActive : ""}`}
+                onClick={() => setActiveIncidentTab("confirmation")}
                 type="button"
               >
-                Backup Requests ({incidentCounts.backup})
+                Confirmation ({incidentCounts.confirmation})
               </button>
             </div>
 
             {visibleIncidents.length === 0 && (
-              <p className={styles.distanceInfo}>No pending alerts or backup requests found.</p>
+              <p className={styles.distanceInfo}>No pending alerts or validated incidents found.</p>
             )}
 
             <div className={styles.tableScroll}>
@@ -1238,7 +1183,7 @@ setTimeout(() => {
                 <tbody>
                   {visibleIncidents.map((a) => (
                     <tr key={a.id}>
-                      <td>{a.__isBackupRequest ? "Backup Request" : a.type}</td>
+                      <td>{a.type}</td>
                       <td>{a.userName}</td>
                       <td>{a.userContact}</td>
                       <td>{a.userAddress}</td>
@@ -1247,13 +1192,24 @@ setTimeout(() => {
     ? new Date(a.timestamp.seconds * 1000).toLocaleString()
     : "Unknown"}
 </td>
-                      <td style={{ display: "flex", gap: "8px" }}>
-  <button
-    className={styles.dispatchBtn}
-    onClick={() => handleAlertSelect(a)}
-  >
-    Dispatch
-  </button>
+                      <td style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+  {normalizeStatus(a.status) === "pending" && (
+    <button
+      className={styles.dispatchBtn}
+      onClick={() => handleAlertSelect(a)}
+    >
+      Dispatch
+    </button>
+  )}
+
+  {normalizeStatus(a.status) === "validated" && (
+    <button
+      className={styles.dispatchBtn}
+      onClick={() => confirmIncident(a)}
+    >
+      Confirm
+    </button>
+  )}
 
   <button
     className={styles.viewBtn}
@@ -1490,12 +1446,22 @@ setTimeout(() => {
             </div>
 
             <div className={styles.modalActions}>
-              <button
-                className={styles.dispatchBtn}
-                onClick={() => handleAlertSelect(previewAlert)}
-              >
-                Dispatch
-              </button>
+              {normalizeStatus(previewAlert?.status) === "pending" && (
+                <button
+                  className={styles.dispatchBtn}
+                  onClick={() => handleAlertSelect(previewAlert)}
+                >
+                  Dispatch
+                </button>
+              )}
+              {normalizeStatus(previewAlert?.status) === "validated" && (
+                <button
+                  className={styles.dispatchBtn}
+                  onClick={() => confirmIncident(previewAlert)}
+                >
+                  Confirm
+                </button>
+              )}
               <button
                 className={styles.closeBtn}
                 onClick={() => setShowAlertPreviewModal(false)}
@@ -1581,7 +1547,35 @@ setTimeout(() => {
       <h3 className={styles.modalTitle}>Dispatch Successful</h3>
 
       <p style={{ marginTop: "10px" }}>
-        Responders have been dispatched successfully.
+        {dispatchSuccessMessage || "Responders have been dispatched successfully."}
+      </p>
+
+      <p style={{ fontSize: "12px", color: "#888", marginTop: "10px" }}>
+        This will close automatically...
+      </p>
+    </div>
+  </div>
+)}
+
+{showConfirmSuccessModal && (
+  <div
+    className={styles.modalOverlay}
+    onClick={() => setShowConfirmSuccessModal(false)}
+  >
+    <div
+      className={styles.modalWide}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: "400px",
+        maxWidth: "90%",
+        textAlign: "center",
+        padding: "24px",
+      }}
+    >
+      <h3 className={styles.modalTitle}>Confirmation Successful</h3>
+
+      <p style={{ marginTop: "10px" }}>
+        {confirmSuccessMessage || "Incident confirmed successfully."}
       </p>
 
       <p style={{ fontSize: "12px", color: "#888", marginTop: "10px" }}>

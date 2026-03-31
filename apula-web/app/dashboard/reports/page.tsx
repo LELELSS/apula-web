@@ -8,7 +8,6 @@ import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
 import styles from "./reportStyles.module.css";
 import jsPDF from "jspdf";
-import { serverTimestamp } from "firebase/firestore";
 
 import {
   collection,
@@ -30,11 +29,13 @@ type ReportItem = {
   userAddress?: string;
   status?: string;
   timestamp?: { seconds: number };
-  resolvedAt?: { seconds: number }; // ✅ ADD THIS
+  confirmedAt?: { seconds: number };
   monitoringStatus?: string;
   monitoringMessage?: string;
   monitoringUpdatedAt?: { seconds: number };
   monitoredBy?: string;
+  confirmationStatus?: string;
+  confirmedBy?: string;
 };
 
 type ResponderItem = {
@@ -48,10 +49,26 @@ type ResponderItem = {
 
 type DispatchInfo = {
   id?: string;
-  dispatchType?: string;
-  isBackup?: boolean;
   timestamp?: { seconds: number };
   responders?: ResponderItem[];
+  status?: string;
+  confirmedAt?: { seconds: number };
+  confirmedBy?: string;
+  leaderName?: string;
+  vehicle?: string;
+};
+
+type TeamItem = {
+  id: string;
+  teamName?: string;
+  leaderId?: string;
+  leaderName?: string;
+  members?: Array<{
+    id?: string;
+    name?: string;
+    status?: string;
+    teamName?: string;
+  }>;
 };
 
 const ReportPage = () => {
@@ -65,6 +82,7 @@ const ReportPage = () => {
   const [editedStatus, setEditedStatus] = useState("");
 
   const [dispatches, setDispatches] = useState<DispatchInfo[]>([]);
+  const [teams, setTeams] = useState<TeamItem[]>([]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -82,6 +100,24 @@ const ReportPage = () => {
     });
 
     return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const loadTeams = async () => {
+      try {
+        const snap = await getDocs(collection(db, "teams"));
+        const data = snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        })) as TeamItem[];
+        setTeams(data);
+      } catch (error) {
+        console.error("Error loading teams:", error);
+        setTeams([]);
+      }
+    };
+
+    loadTeams();
   }, []);
 
   useEffect(() => {
@@ -123,11 +159,6 @@ const ReportPage = () => {
           })) as DispatchInfo[];
 
           allDispatches.sort((a, b) => {
-            const aPrimary = a.dispatchType === "Primary" || a.isBackup === false ? 0 : 1;
-            const bPrimary = b.dispatchType === "Primary" || b.isBackup === false ? 0 : 1;
-
-            if (aPrimary !== bPrimary) return aPrimary - bPrimary;
-
             const aTime = a.timestamp?.seconds ?? 0;
             const bTime = b.timestamp?.seconds ?? 0;
             return aTime - bTime;
@@ -160,29 +191,38 @@ const ReportPage = () => {
     setEditedStatus(selectedReport.status || "");
   };
 
-const handleSave = async () => {
-  if (!selectedReport) return;
+  const handleSave = async () => {
+    if (!selectedReport) return;
 
-  const ref = doc(db, "alerts", selectedReport.id);
+    const ref = doc(db, "alerts", selectedReport.id);
 
-  if (editedStatus === "Resolved") {
-    await updateDoc(ref, {
-      status: "Resolved",
-      resolvedAt: serverTimestamp(), // ✅ SAVE TIME
-    });
-  } else {
     await updateDoc(ref, {
       status: editedStatus,
     });
-  }
 
-  setEditMode(false);
-};
+    setEditMode(false);
+  };
 
   const getTeamName = (dispatch: DispatchInfo) =>
     dispatch.responders?.[0]?.team ||
     dispatch.responders?.[0]?.teamId ||
     "N/A";
+
+  const getTeamDetails = (dispatch: DispatchInfo) => {
+    const dispatchTeamName = getTeamName(dispatch);
+
+    const matchedTeam =
+      teams.find((t) => t.teamName === dispatchTeamName) ||
+      teams.find((t) =>
+        t.members?.some(
+          (member) =>
+            member.teamName === dispatchTeamName ||
+            member.id === dispatch.responders?.[0]?.teamId
+        )
+      );
+
+    return matchedTeam || null;
+  };
 
   const downloadSingleReportPDF = async (report: ReportItem) => {
     const pdf = new jsPDF({
@@ -292,7 +332,30 @@ const handleSave = async () => {
         dispatches[0].timestamp!.seconds * 1000
       ).toLocaleString();
 
-      y = addLabelValue("Primary Dispatch Time:", dispatchedAt, margin, y);
+      y = addLabelValue("Dispatch Time:", dispatchedAt, margin, y);
+    }
+
+    if (report.status === "Confirmed") {
+      const confirmedTimestamp =
+        report.confirmedAt?.seconds ??
+        dispatches[0]?.confirmedAt?.seconds ??
+        report.monitoringUpdatedAt?.seconds;
+
+      if (confirmedTimestamp) {
+        y = addLabelValue(
+          "Confirmed At:",
+          new Date(confirmedTimestamp * 1000).toLocaleString(),
+          margin,
+          y
+        );
+      }
+
+      y = addLabelValue(
+        "Confirmed By:",
+        report.confirmedBy || dispatches[0]?.confirmedBy || "N/A",
+        margin,
+        y
+      );
     }
 
     y += 14;
@@ -305,73 +368,52 @@ const handleSave = async () => {
 
     if (dispatches.length > 0) {
       const primaryDispatch = dispatches[0];
-      const backupDispatches = dispatches.slice(1);
+      const respondersList = primaryDispatch.responders || [];
+      const teamName = getTeamName(primaryDispatch);
+      const matchedTeam = getTeamDetails(primaryDispatch);
+
+      const leaderName =
+        matchedTeam?.leaderName ||
+        primaryDispatch.leaderName ||
+        respondersList[0]?.name ||
+        "N/A";
+
+      const vehicleName =
+        primaryDispatch.vehicle ||
+        respondersList.find((r) => r?.vehicle)?.vehicle ||
+        "N/A";
 
       y += 14;
-      y = addSectionTitle("Primary Responders", y);
+      y = addSectionTitle("Responders", y);
 
-      y = addLabelValue("Team Name:", getTeamName(primaryDispatch), margin, y);
+      y = addLabelValue("Team Name:", teamName || "N/A", margin, y);
+      y = addLabelValue("Leader:", leaderName || "N/A", margin, y);
+      y = addLabelValue("Vehicle:", vehicleName || "N/A", margin, y);
 
-      if (primaryDispatch.responders && primaryDispatch.responders.length > 0) {
-        primaryDispatch.responders.forEach((r, index) => {
-          ensurePageSpace(70);
+      ensurePageSpace(30);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.text("Members", margin, y);
+      y += 18;
+
+      if (respondersList.length > 0) {
+        respondersList.forEach((r, index) => {
+          ensurePageSpace(75);
 
           pdf.setFont("helvetica", "bold");
           pdf.setFontSize(11);
-          pdf.text(`Responder ${index + 1}`, margin + 12, y);
+          pdf.text(`Member ${index + 1}`, margin + 12, y);
           y += 16;
 
           y = addLabelValue("Name:", r.name || "N/A", margin + 24, y);
           y = addLabelValue("Contact:", r.contact || "N/A", margin + 24, y);
           y = addLabelValue("Email:", r.email || "N/A", margin + 24, y);
-          y = addLabelValue("Vehicle:", r.vehicle || "N/A", margin + 24, y);
           y += 10;
         });
-      }
-
-      if (backupDispatches.length > 0) {
-        y += 14;
-        y = addSectionTitle("Backup Responders", y);
-
-        backupDispatches.forEach((dispatch, teamIndex) => {
-          ensurePageSpace(80);
-
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(11);
-          pdf.text(
-            `Backup Team ${teamIndex + 1}: ${getTeamName(dispatch)}`,
-            margin,
-            y
-          );
-          y += 18;
-
-          if (dispatch.timestamp) {
-            const backupTime = new Date(
-              dispatch.timestamp.seconds * 1000
-            ).toLocaleString();
-
-            y = addLabelValue("Dispatch Time:", backupTime, margin + 12, y);
-          }
-
-          if (dispatch.responders && dispatch.responders.length > 0) {
-            dispatch.responders.forEach((r, responderIndex) => {
-              ensurePageSpace(70);
-
-              pdf.setFont("helvetica", "bold");
-              pdf.setFontSize(11);
-              pdf.text(`Responder ${responderIndex + 1}`, margin + 12, y);
-              y += 16;
-
-              y = addLabelValue("Name:", r.name || "N/A", margin + 24, y);
-              y = addLabelValue("Contact:", r.contact || "N/A", margin + 24, y);
-              y = addLabelValue("Email:", r.email || "N/A", margin + 24, y);
-              y = addLabelValue("Vehicle:", r.vehicle || "N/A", margin + 24, y);
-              y += 10;
-            });
-          }
-
-          y += 6;
-        });
+      } else {
+        y = addLabelValue("Name:", "N/A", margin + 24, y);
+        y = addLabelValue("Contact:", "N/A", margin + 24, y);
+        y = addLabelValue("Email:", "N/A", margin + 24, y);
       }
     }
 
@@ -421,7 +463,7 @@ const handleSave = async () => {
             </div>
 
             <div className={styles.statusFilters}>
-              {["All", "Pending", "Dispatched", "Resolved"].map((s) => (
+              {["All", "Pending", "Dispatched", "Confirmed"].map((s) => (
                 <button
                   key={s}
                   className={`${styles.filterBtn} ${
@@ -555,58 +597,52 @@ const handleSave = async () => {
 
                   {dispatches.length > 0 && dispatches[0].timestamp && (
                     <p>
-                      <strong>Primary Dispatch Time:</strong>{" "}
+                      <strong>Dispatch Time:</strong>{" "}
                       {new Date(
                         dispatches[0].timestamp.seconds * 1000
                       ).toLocaleString()}
                     </p>
                   )}
 
-                 {selectedReport.status === "Resolved" && (() => {
-  const resolvedTimestamp =
-    selectedReport.resolvedAt?.seconds ??
-    selectedReport.monitoringUpdatedAt?.seconds;
+                  {selectedReport.status === "Confirmed" && (() => {
+                    const confirmedTimestamp =
+                      selectedReport.confirmedAt?.seconds ??
+                      dispatches[0]?.confirmedAt?.seconds ??
+                      selectedReport.monitoringUpdatedAt?.seconds;
 
-  if (!resolvedTimestamp) return null;
+                    if (
+                      !confirmedTimestamp &&
+                      !selectedReport.confirmedBy &&
+                      !dispatches[0]?.confirmedBy
+                    ) {
+                      return null;
+                    }
 
-  return (
-    <p>
-      <strong>Resolved At:</strong>{" "}
-      {new Date(resolvedTimestamp * 1000).toLocaleString()}
-    </p>
-  );
-})()}
-                  {/*selectedReport.monitoringStatus && (
-                    <p>
-                      <strong>Monitoring Status:</strong> {selectedReport.monitoringStatus}
-                    </p>
-                  )}
+                    return (
+                      <>
+                        {confirmedTimestamp && (
+                          <p>
+                            <strong>Confirmed At:</strong>{" "}
+                            {new Date(
+                              confirmedTimestamp * 1000
+                            ).toLocaleString()}
+                          </p>
+                        )}
 
-                  {selectedReport.monitoringMessage && (
-                    <p>
-                      <strong>Monitoring Note:</strong> {selectedReport.monitoringMessage}
-                    </p>
-                  )}
-
-                  {selectedReport.monitoredBy && (
-                    <p>
-                      <strong>Monitored By:</strong> {selectedReport.monitoredBy}
-                    </p>
-                  )}
-
-                  {selectedReport.monitoringUpdatedAt?.seconds && (
-                    <p>
-                      <strong>Monitoring Updated At:</strong>{" "}
-                      {new Date(selectedReport.monitoringUpdatedAt.seconds * 1000).toLocaleString()}
-                    </p>*/}
-               
+                        <p>
+                          <strong>Confirmed By:</strong>{" "}
+                          {selectedReport.confirmedBy ||
+                            dispatches[0]?.confirmedBy ||
+                            "N/A"}
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {dispatches.length > 0 && (
                   <div className={styles.responderSection}>
-                    <div className={styles.responderTitle}>
-                      Primary Responders
-                    </div>
+                    <div className={styles.responderTitle}>Responders</div>
 
                     <div className={styles.responderItem}>
                       <strong>Team:</strong> {getTeamName(dispatches[0])}
@@ -618,35 +654,6 @@ const handleSave = async () => {
                         {r.email || "N/A"}
                       </div>
                     ))}
-
-                    {dispatches.slice(1).length > 0 && (
-                      <>
-                        <div
-                          className={styles.responderTitle}
-                          style={{ marginTop: "14px" }}
-                        >
-                          Backup Responders
-                        </div>
-
-                        {dispatches.slice(1).map((dispatch, teamIndex) => (
-                          <div
-                            key={dispatch.id || teamIndex}
-                            style={{ marginBottom: "12px" }}
-                          >
-                            <div className={styles.responderItem}>
-                              <strong>Team:</strong> {getTeamName(dispatch)}
-                            </div>
-
-                            {dispatch.responders?.map((r, i) => (
-                              <div key={i} className={styles.responderItem}>
-                                {r.name || "N/A"} • {r.contact || "N/A"} •{" "}
-                                {r.email || "N/A"}
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                      </>
-                    )}
                   </div>
                 )}
               </div>

@@ -329,6 +329,7 @@
 
   .contentSection {
     padding: 18px;
+    overflow-x: hidden;
   }
 
   .userTable,
@@ -339,6 +340,7 @@
   .userTable tr {
     display: block;
     width: 100%;
+    box-sizing: border-box;
   }
 
   .userTable thead {
@@ -352,23 +354,26 @@
     background: #fff;
     box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
     padding: 1rem;
+    overflow: hidden;
   }
 
   .userTable td {
     border: none;
-    padding: 0.5rem 0;
+    padding: 0.6rem 0;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
+    gap: 6px;
     word-break: break-word;
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 
   .userTable td::before {
     content: attr(data-label);
     font-weight: 700;
     color: #a30000;
-    min-width: 80px;
+    min-width: unset;
   }
 
   .noResults {
@@ -395,11 +400,14 @@
   .actionCell {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
   }
 
   .acceptBtn,
-  .declineBtn {
+  .declineBtn,
+  .cancelBtn {
     width: 100%;
+    margin-right: 0;
   }
 
   .confirmButtons {

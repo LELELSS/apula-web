@@ -47,13 +47,10 @@
   gap: 12px;
   padding: 22px;
   border-radius: 14px;
-
   background: #ffffff;
   border: 2px solid #a30000;
-
   cursor: pointer;
   overflow: hidden;
-
   transition: transform 0.25s ease;
 }
 
@@ -149,6 +146,7 @@
   border: 1px solid #d1d5db;
   outline: none;
   transition: all 0.25s ease;
+  box-sizing: border-box;
 }
 
 .searchInput:focus {
@@ -198,14 +196,11 @@
   border-radius: 8px;
   cursor: pointer;
   overflow: hidden;
-
   background: #ffffff;
   border: 2px solid #a30000;
   color: black;
   font-weight: bold;
-
   margin-right: 6px;
-
   transition: color 0.25s ease;
 }
 
@@ -267,8 +262,6 @@
 .pageInfo {
   font-weight: 600;
 }
-
-/* MODAL */
 
 /* MODAL */
 
@@ -411,6 +404,7 @@
   margin-bottom: 12px;
   background: #ffffff;
   color: #374151;
+  box-sizing: border-box;
 }
 
 .inputField:focus {
@@ -457,6 +451,7 @@
 .okBtn:hover {
   color: #a30000;
 }
+
 /* SAVE CHANGES BUTTON */
 
 .saveBtn {
@@ -474,7 +469,6 @@
   transition: color 0.3s ease;
 }
 
-/* sliding background */
 .saveBtn::before {
   content: "";
   position: absolute;
@@ -487,7 +481,6 @@
   z-index: 0;
 }
 
-/* text above animation */
 .saveBtn span {
   position: relative;
   z-index: 1;
@@ -500,7 +493,6 @@
 .saveBtn:hover {
   color: #a30000;
 }
-
 
 /* CLOSE BUTTON */
 
@@ -519,7 +511,6 @@
   transition: color 0.3s ease;
 }
 
-/* sliding background */
 .closeBtn::before {
   content: "";
   position: absolute;
@@ -532,7 +523,6 @@
   z-index: 0;
 }
 
-/* text above animation */
 .closeBtn span {
   position: relative;
   z-index: 1;
@@ -551,7 +541,7 @@
 .successOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.35);
+  background: rgba(0, 0, 0, 0.35);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -567,6 +557,34 @@
 /* MOBILE */
 
 @media (max-width: 768px) {
+  .container {
+    padding: 14px;
+  }
+
+  .contentSection {
+    padding: 16px;
+  }
+
+  .headerRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .filters {
+    width: 100%;
+    display: block;
+  }
+
+  .searchWrapper {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .searchInput {
+    width: 100%;
+    box-sizing: border-box;
+  }
 
   .summaryRow {
     grid-template-columns: repeat(2, 1fr);
@@ -600,7 +618,9 @@
   .userTable td {
     display: flex;
     justify-content: space-between;
+    gap: 10px;
     padding: 6px 0;
+    flex-wrap: wrap;
   }
 
   .userTable td::before {
@@ -613,5 +633,4 @@
     flex-wrap: nowrap;
     gap: 8px;
   }
-
 }

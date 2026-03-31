@@ -82,21 +82,47 @@
   outline: 2px solid #a30000;
 }
 
+/* ===== Sliding Buttons ===== */
+.button,
+.errorModalBtn {
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  border: 2px solid #a30000;
+  background: #a30000;
+  color: #ffffff;
+  font-weight: 600;
+  transition: color 0.35s ease, border-color 0.35s ease;
+}
+
+.button::before,
+.errorModalBtn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  transform: translateX(-100%);
+  transition: transform 0.35s ease;
+  z-index: -1;
+}
+
+.button:hover,
+.errorModalBtn:hover {
+  color: #a30000;
+  border-color: #a30000;
+}
+
+.button:hover::before,
+.errorModalBtn:hover::before {
+  transform: translateX(0);
+}
+
 .button {
   width: 100%;
   padding: 12px;
-  background-color: #a30000;
-  color: white;
-  font-weight: bold;
-  border: none;
   border-radius: 8px;
   cursor: pointer;
   font-size: 1rem;
-  transition: 0.3s;
-}
-
-.button:hover {
-  background-color: #800000;
 }
 
 .error {
@@ -123,33 +149,35 @@
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .errorModalTitle {
   margin: 0 0 10px;
   color: #8b0000;
   font-size: 1.2rem;
+  text-align: center;
 }
 
 .errorModalText {
   margin: 0;
   color: #333;
   line-height: 1.5;
+  text-align: center;
 }
 
 .errorModalBtn {
   margin-top: 16px;
-  border: none;
   border-radius: 8px;
-  background: #8b0000;
-  color: #fff;
-  font-weight: 600;
-  padding: 10px 14px;
+  padding: 10px 18px;
   cursor: pointer;
-}
-
-.errorModalBtn:hover {
-  background: #690000;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 120px;
 }
 
 .signupText {
@@ -186,13 +214,13 @@
   cursor: pointer;
   transition: 0.3s ease;
   text-decoration: underline;
+  padding: 0;
 }
 
 .forgotLink:hover {
   color: #e63946;
 }
 
-/* ===== Responsive Styles ===== */
 @media (max-width: 768px) {
   .bgContainer {
     background: none;
@@ -276,5 +304,14 @@
 
   .signupText {
     margin: 8px 0 0 0;
+  }
+
+  .errorModal {
+    padding: 18px;
+    max-width: 90%;
+  }
+
+  .errorModalBtn {
+    width: 100%;
   }
 }

@@ -115,7 +115,7 @@
   border-color: #bfdbfe !important;
 }
 
-.activeFilter.resolvedBtn {
+.activeFilter.confirmedBtn {
   background: #ecfdf3 !important;
   color: #166534 !important;
   border-color: #bbf7d0 !important;
@@ -188,7 +188,7 @@
   border: 1px solid #bfdbfe;
 }
 
-.resolved {
+.confirmed {
   background: #ecfdf3;
   color: #166534;
   border: 1px solid #bbf7d0;
@@ -205,14 +205,11 @@
   border-radius: 10px;
   cursor: pointer;
   font-weight: 600;
-
   position: relative;
   overflow: hidden;
-
   transition: color 0.3s ease;
 }
 
-/* sliding white background */
 .saveBtn::before,
 .closeBtn::before {
   content: "";
@@ -226,20 +223,17 @@
   z-index: 0;
 }
 
-/* keep text above slide */
 .saveBtn span,
 .closeBtn span {
   position: relative;
   z-index: 1;
 }
 
-/* slide animation */
 .saveBtn:hover::before,
 .closeBtn:hover::before {
   left: 0;
 }
 
-/* hover text color */
 .saveBtn:hover,
 .closeBtn:hover {
   color: #a30000;
@@ -258,8 +252,6 @@
   color: #ffffff;
 }
 
-
-/* ----------- MODAL ----------- */
 /* ----------- MODAL ----------- */
 .modalOverlay {
   position: fixed;
@@ -269,7 +261,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 999;
+  z-index: 2000;
   padding: 16px;
   animation: fadeIn 0.25s ease;
 }
@@ -279,16 +271,14 @@
   border-radius: 16px;
   width: 100%;
   max-width: 460px;
-  height: 620px;              /* fixed height */
+  height: 620px;
   max-height: 70vh;
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
-
   display: flex;
   flex-direction: column;
-  overflow: hidden;           /* important */
+  overflow: hidden;
 }
 
-/* title stays fixed */
 .modalTitle {
   flex-shrink: 0;
   font-size: 1.5rem;
@@ -301,7 +291,6 @@
   background: #ffffff;
 }
 
-/* scrollable body */
 .modalBody {
   flex: 1;
   overflow-y: auto;
@@ -311,7 +300,6 @@
   gap: 18px;
 }
 
-/* fixed footer */
 .modalActions {
   flex-shrink: 0;
   display: flex;
@@ -506,16 +494,13 @@
   border-radius: 8px;
   cursor: pointer;
   overflow: hidden;
-
   background: #ffffff;
   border: 2px solid #a30000;
   color: #a30000;
   font-weight: bold;
-
   transition: color 0.25s ease;
 }
 
-/* sliding red background */
 .viewBtn::before {
   content: "";
   position: absolute;
@@ -528,18 +513,15 @@
   z-index: 0;
 }
 
-/* slide animation */
 .viewBtn:hover::before {
   left: 0;
 }
 
-/* keep text above */
 .viewBtn span {
   position: relative;
   z-index: 1;
 }
 
-/* hover text */
 .viewBtn:hover {
   color: #ffffff;
 }
@@ -815,7 +797,6 @@
     width: 100%;
   }
 }
-
 
 .pagination {
   display: flex;

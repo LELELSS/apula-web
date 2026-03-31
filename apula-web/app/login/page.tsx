@@ -48,7 +48,7 @@ export default function Login() {
       const userCredential = await signInWithEmailAndPassword(
         auth,
         username,
-        password
+        password,
       );
       const user = userCredential.user;
 
@@ -68,7 +68,9 @@ export default function Login() {
 
       if (userData.status === "Declined") {
         await signOut(auth);
-        throw new Error("Your account request was declined by the super admin.");
+        throw new Error(
+          "Your account request was declined by the super admin.",
+        );
       }
 
       if (userData.role !== "superadmin" && userData.approved === false) {
@@ -76,8 +78,9 @@ export default function Login() {
         throw new Error("Your account is pending super admin approval.");
       }
 
-      setSessionCookie(createSessionPayload(user.uid, userData.role || "admin"));
-
+      setSessionCookie(
+        createSessionPayload(user.uid, userData.role || "admin"),
+      );
 
       toast.success("Admin login successful!", {
         position: "top-center",
@@ -90,10 +93,19 @@ export default function Login() {
       }, 1500);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Invalid email or password.");
+
+      if (
+        err.code === "auth/wrong-password" ||
+        err.code === "auth/invalid-credential"
+      ) {
+        setError("Incorrect password.");
+      } else if (err.code === "auth/user-not-found") {
+        setError("No account found with this email.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
+
       setShowErrorModal(true);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -118,7 +130,7 @@ export default function Login() {
         error.message.includes("user-not-found")
           ? "No account found with that email."
           : "Failed to send reset email.",
-        { position: "top-center" }
+        { position: "top-center" },
       );
     } finally {
       setResetLoading(false);
@@ -180,10 +192,18 @@ export default function Login() {
       </div>
 
       {showErrorModal && (
-        <div className={styles.errorModalOverlay} onClick={() => setShowErrorModal(false)}>
-          <div className={styles.errorModal} onClick={(e) => e.stopPropagation()}>
+        <div
+          className={styles.errorModalOverlay}
+          onClick={() => setShowErrorModal(false)}
+        >
+          <div
+            className={styles.errorModal}
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className={styles.errorModalTitle}>Login Failed</h3>
-            <p className={styles.errorModalText}>{error || "Invalid email or password."}</p>
+            <p className={styles.errorModalText}>
+              {error || "Invalid email or password."}
+            </p>
             <button
               type="button"
               className={styles.errorModalBtn}

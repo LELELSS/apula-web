@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import styles from "@/app/dashboard/dispatch/dispatch.module.css";
+import styles from "./alertDispatchModal.module.css";
 
 import {
   collection,
@@ -20,7 +20,10 @@ import {
 import { auth, db } from "@/lib/firebase";
 import { logActivity } from "@/lib/activityLog";
 
-const normalizeStatus = (value: unknown) => String(value || "").trim().toLowerCase();
+const normalizeStatus = (value: unknown) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
 
 const timestampToMillis = (value: any) => {
   if (!value) return 0;
@@ -42,31 +45,17 @@ const parseCoordinate = (value: unknown): number | null => {
   return null;
 };
 
-const hasValidCoordinates = (lat: number | null, lng: number | null) => (
-  lat !== null &&
-  lng !== null &&
-  Math.abs(lat) <= 90 &&
-  Math.abs(lng) <= 180
-);
+const hasValidCoordinates = (lat: number | null, lng: number | null) =>
+  lat !== null && lng !== null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 
 const normalizeIncident = (id: string, data: any) => {
-  const type =
-    data?.type ||
-    data?.alertType ||
-    "Fire Alert";
+  const type = data?.type || data?.alertType || "Fire Alert";
 
   const userName =
-    data?.userName ||
-    data?.reportedBy ||
-    data?.name ||
-    "Unknown";
+    data?.userName || data?.reportedBy || data?.name || "Unknown";
 
   const userContact =
-    data?.userContact ||
-    data?.contact ||
-    data?.phone ||
-    data?.mobile ||
-    "";
+    data?.userContact || data?.contact || data?.phone || data?.mobile || "";
 
   const userAddress =
     data?.userAddress ||
@@ -91,17 +80,15 @@ const normalizeIncident = (id: string, data: any) => {
     userAddress,
     location,
     status: data?.status || "Pending",
-    timestamp:
-      data?.timestamp ||
-      data?.createdAt ||
-      data?.updatedAt ||
-      null,
+    timestamp: data?.timestamp || data?.createdAt || data?.updatedAt || null,
   };
 };
 
 const AlertDispatchModal = () => {
   const [showModal, setShowModal] = useState(false);
-  const [activeIncidentTab, setActiveIncidentTab] = useState<"all" | "alerts" | "confirmation">("all");
+  const [activeIncidentTab, setActiveIncidentTab] = useState<
+    "all" | "alerts" | "confirmation"
+  >("all");
 
   const [dispatchStep, setDispatchStep] = useState<1 | 2 | 3>(1);
 
@@ -109,32 +96,51 @@ const AlertDispatchModal = () => {
   const [selectedAlert, setSelectedAlert] = useState<any>(null);
 
   const [responders, setResponders] = useState<any[]>([]);
-  const [selectedResponderIds, setSelectedResponderIds] = useState<Set<string>>(new Set());
+  const [selectedResponderIds, setSelectedResponderIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   const [teams, setTeams] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [stations, setStations] = useState<any[]>([]);
 
-  const [teamDistancesKm, setTeamDistancesKm] = useState<Record<string, number | null>>({});
-  const [recommendedTeamName, setRecommendedTeamName] = useState<string | null>(null);
-  const [alreadyDispatchedTeams, setAlreadyDispatchedTeams] = useState<Set<string>>(new Set());
+  const [teamDistancesKm, setTeamDistancesKm] = useState<
+    Record<string, number | null>
+  >({});
+  const [recommendedTeamName, setRecommendedTeamName] = useState<string | null>(
+    null,
+  );
+  const [alreadyDispatchedTeams, setAlreadyDispatchedTeams] = useState<
+    Set<string>
+  >(new Set());
   const [isCalculatingDistances, setIsCalculatingDistances] = useState(false);
-  const stationCoordCacheRef = useRef<Record<string, { lat: number; lng: number } | null>>({});
+  const stationCoordCacheRef = useRef<
+    Record<string, { lat: number; lng: number } | null>
+  >({});
 
   const [selectedDispatch, setSelectedDispatch] = useState<any>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [previewAlert, setPreviewAlert] = useState<any>(null);
   const [showAlertPreviewModal, setShowAlertPreviewModal] = useState(false);
-  const [previewImageCandidates, setPreviewImageCandidates] = useState<string[]>([]);
+  const [previewImageCandidates, setPreviewImageCandidates] = useState<
+    string[]
+  >([]);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [previewImageFailed, setPreviewImageFailed] = useState(false);
-  const [resolvedPreviewCoords, setResolvedPreviewCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [resolvedPreviewCoords, setResolvedPreviewCoords] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
 
-
-  const [showDispatchSuccessModal, setShowDispatchSuccessModal] = useState(false);
+  const [showDispatchSuccessModal, setShowDispatchSuccessModal] =
+    useState(false);
   const [dispatchSuccessMessage, setDispatchSuccessMessage] = useState("");
   const [showConfirmSuccessModal, setShowConfirmSuccessModal] = useState(false);
   const [confirmSuccessMessage, setConfirmSuccessMessage] = useState("");
+
+  const [alertDispatchedTeams, setAlertDispatchedTeams] = useState<
+    Record<string, string[]>
+  >({});
 
   const extractGoogleDriveFileId = (url: string): string | null => {
     const filePathMatch = url.match(/\/file\/d\/([^/]+)/);
@@ -222,18 +228,20 @@ const AlertDispatchModal = () => {
 
       if (hasValidCoordinates(directLat, directLng)) {
         if (!cancelled) {
-          setResolvedPreviewCoords({ lat: directLat as number, lng: directLng as number });
+          setResolvedPreviewCoords({
+            lat: directLat as number,
+            lng: directLng as number,
+          });
         }
         return;
       }
 
-      const address =
-        String(
-          previewAlert?.userAddress ||
+      const address = String(
+        previewAlert?.userAddress ||
           previewAlert?.location ||
           previewAlert?.alertLocation ||
-          ""
-        ).trim();
+          "",
+      ).trim();
 
       if (!address) {
         if (!cancelled) setResolvedPreviewCoords(null);
@@ -241,9 +249,12 @@ const AlertDispatchModal = () => {
       }
 
       try {
-        const response = await fetch(`/api/geocode?q=${encodeURIComponent(address)}`, {
-          cache: "no-store",
-        });
+        const response = await fetch(
+          `/api/geocode?q=${encodeURIComponent(address)}`,
+          {
+            cache: "no-store",
+          },
+        );
 
         if (!response.ok) {
           throw new Error(`Geocode failed with status ${response.status}`);
@@ -253,8 +264,7 @@ const AlertDispatchModal = () => {
         const first = Array.isArray(payload) ? payload[0] : null;
 
         const geocodedLat =
-          parseCoordinate(first?.lat) ??
-          parseCoordinate(first?.latitude);
+          parseCoordinate(first?.lat) ?? parseCoordinate(first?.latitude);
 
         const geocodedLng =
           parseCoordinate(first?.lon) ??
@@ -262,7 +272,10 @@ const AlertDispatchModal = () => {
           parseCoordinate(first?.longitude);
 
         if (!cancelled && hasValidCoordinates(geocodedLat, geocodedLng)) {
-          setResolvedPreviewCoords({ lat: geocodedLat as number, lng: geocodedLng as number });
+          setResolvedPreviewCoords({
+            lat: geocodedLat as number,
+            lng: geocodedLng as number,
+          });
           return;
         }
       } catch (error) {
@@ -292,36 +305,30 @@ const AlertDispatchModal = () => {
     previewAlert?.alertLocation,
   ]);
 
-
   const viewDispatchInfo = async (teamName: string) => {
-  const snap = await getDocs(
-    query(
-      collection(db, "dispatches"),
-      orderBy("timestamp", "desc")
-    )
-  );
-
-  const latest = snap.docs
-    .map((d) => ({ id: d.id, ...(d.data() as any) }))
-    .find((d: any) =>
-      d.status === "Dispatched" &&
-      d.responders?.some((r: any) => r.team === teamName || r.teamName === teamName)
+    const snap = await getDocs(
+      query(collection(db, "dispatches"), orderBy("timestamp", "desc")),
     );
 
-  if (!latest) {
-    alert("No dispatch record found for this team.");
-    return;
-  }
+    const latest = snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as any) }))
+      .find(
+        (d: any) =>
+          d.status === "Dispatched" &&
+          d.responders?.some(
+            (r: any) => r.team === teamName || r.teamName === teamName,
+          ),
+      );
 
-  setSelectedDispatch(latest);
-  setShowViewModal(true);
-};
+    if (!latest) {
+      alert("No dispatch record found for this team.");
+      return;
+    }
 
+    setSelectedDispatch(latest);
+    setShowViewModal(true);
+  };
 
-
-  // ------------------------------------------------------------
-  // OPEN MODAL WHEN TRIGGERED FROM AlertBellButton
-  // ------------------------------------------------------------
   useEffect(() => {
     const openModal = () => {
       loadAlerts();
@@ -336,41 +343,70 @@ const AlertDispatchModal = () => {
     return () => window.removeEventListener("open-alert-dispatch", openModal);
   }, []);
 
-  // ------------------------------------------------------------
-  // LOAD PENDING ALERTS
-  // ------------------------------------------------------------
   const loadAlerts = async () => {
     const alertSnap = await getDocs(
-      query(collection(db, "alerts"), orderBy("timestamp", "desc"))
+      query(collection(db, "alerts"), orderBy("timestamp", "desc")),
     );
 
     const nextAlerts = alertSnap.docs
       .map((d) => normalizeIncident(d.id, d.data()))
       .filter((item) => {
         const status = normalizeStatus(item.status);
-        return status === "pending" || status === "dispatched" || status === "validated";
+        return (
+          status === "pending" ||
+          status === "dispatched" ||
+          status === "validated"
+        );
       })
-      .sort((a, b) => timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp));
+      .sort(
+        (a, b) =>
+          timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp),
+      );
 
     setAlerts(nextAlerts);
+
+    const dispatchSnap = await getDocs(collection(db, "dispatches"));
+    const dispatchedMap: Record<string, string[]> = {};
+
+    dispatchSnap.docs.forEach((docSnap) => {
+      const data = docSnap.data() as any;
+
+      if (normalizeStatus(data?.status) !== "dispatched") return;
+
+      const alertId = String(data?.alertId || "").trim();
+      if (!alertId) return;
+
+      const teamNames = Array.from(
+        new Set(
+          (data?.responders || [])
+            .map((r: any) => r?.team || r?.teamName)
+            .filter(Boolean)
+            .map((name: string) => String(name)),
+        ),
+      );
+
+      if (!dispatchedMap[alertId]) {
+        dispatchedMap[alertId] = [];
+      }
+
+      dispatchedMap[alertId] = Array.from(
+        new Set([...dispatchedMap[alertId], ...teamNames]),
+      );
+    });
+
+    setAlertDispatchedTeams(dispatchedMap);
   };
 
-  // ------------------------------------------------------------
-  // REAL-TIME RESPONDERS
-  // ------------------------------------------------------------
   useEffect(() => {
     const unsub = onSnapshot(
       query(collection(db, "users"), where("role", "==", "responder")),
       (snap) => {
         setResponders(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      }
+      },
     );
     return () => unsub();
   }, []);
 
-  // ------------------------------------------------------------
-  // LOAD TEAMS & VEHICLES
-  // ------------------------------------------------------------
   useEffect(() => {
     getDocs(collection(db, "teams")).then((snap) => {
       setTeams(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -398,7 +434,7 @@ const AlertDispatchModal = () => {
     lat1: number,
     lon1: number,
     lat2: number,
-    lon2: number
+    lon2: number,
   ) => {
     const toRad = (deg: number) => (deg * Math.PI) / 180;
     const earthRadiusKm = 6371;
@@ -408,8 +444,10 @@ const AlertDispatchModal = () => {
 
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return earthRadiusKm * c;
@@ -443,7 +481,7 @@ const AlertDispatchModal = () => {
 
     try {
       const response = await fetch(
-        `/api/geocode?q=${encodeURIComponent(fallbackAddress)}`
+        `/api/geocode?q=${encodeURIComponent(fallbackAddress)}`,
       );
       const result = await response.json().catch(() => null);
 
@@ -467,7 +505,9 @@ const AlertDispatchModal = () => {
     if (!trimmed) return null;
 
     try {
-      const response = await fetch(`/api/geocode?q=${encodeURIComponent(trimmed)}`);
+      const response = await fetch(
+        `/api/geocode?q=${encodeURIComponent(trimmed)}`,
+      );
       const result = await response.json().catch(() => null);
 
       if (!response.ok || !Array.isArray(result) || result.length === 0) {
@@ -510,8 +550,9 @@ const AlertDispatchModal = () => {
       return stationCoordCacheRef.current[cacheKey];
     }
 
-    const fallbackAddress =
-      String(station?.address || station?.addressNormalized || station?.name || "").trim();
+    const fallbackAddress = String(
+      station?.address || station?.addressNormalized || station?.name || "",
+    ).trim();
 
     const geocoded = await geocodeAddress(fallbackAddress);
     stationCoordCacheRef.current[cacheKey] = geocoded;
@@ -532,7 +573,10 @@ const AlertDispatchModal = () => {
       }
 
       const snap = await getDocs(
-        query(collection(db, "dispatches"), where("alertId", "==", baseAlertId))
+        query(
+          collection(db, "dispatches"),
+          where("alertId", "==", baseAlertId),
+        ),
       );
 
       const dispatchedTeams = new Set<string>();
@@ -555,6 +599,41 @@ const AlertDispatchModal = () => {
 
     loadAlreadyDispatchedTeams();
   }, [dispatchStep, selectedAlert]);
+
+  const groupedList = teams
+    .map((team) => {
+      const members = responders.filter((r) => r.teamId === team.id);
+
+      if (members.length === 0) return null;
+
+      const hasStation =
+        team.stationId ||
+        team.stationName ||
+        stations.some(
+          (s) => s.id === team.stationId || s.name === team.stationName,
+        );
+
+      if (!hasStation) return null;
+
+      const vehicle =
+        vehicles.find((v) => v.assignedTeamId === team.id)?.code ||
+        vehicles.find((v) => v.assignedTeam === team.teamName)?.code ||
+        "Unassigned";
+
+      const statuses = members.map((m) => m.status);
+
+      let status = "Unavailable";
+      if (statuses.some((s) => s === "Available")) status = "Available";
+      if (statuses.every((s) => s === "Dispatched")) status = "Dispatched";
+
+      return {
+        team: team.teamName,
+        vehicle,
+        responders: members,
+        status,
+      };
+    })
+    .filter(Boolean);
 
   useEffect(() => {
     const computeDistances = async () => {
@@ -581,7 +660,7 @@ const AlertDispatchModal = () => {
         const station = stations.find(
           (s) =>
             (team?.stationId && s.id === team.stationId) ||
-            (team?.stationName && s.name === team.stationName)
+            (team?.stationName && s.name === team.stationName),
         );
 
         const stationCoords = await getStationCoordinates(station);
@@ -594,27 +673,30 @@ const AlertDispatchModal = () => {
           stationCoords.lat,
           stationCoords.lng,
           alertCoords.lat,
-          alertCoords.lng
+          alertCoords.lng,
         );
       }
 
-      const nearest = Object.entries(distanceMap)
-        .filter(([, km]) => km !== null)
-        .sort((a, b) => (a[1] as number) - (b[1] as number))[0];
+      const availableTeams = (groupedList as any[]).filter(
+        (g) => g.status === "Available",
+      );
+
+      const nearestAvailable = availableTeams
+        .map((g) => ({
+          team: g.team,
+          distance: distanceMap[g.team],
+        }))
+        .filter((item) => item.distance !== null && item.distance !== undefined)
+        .sort((a, b) => (a.distance as number) - (b.distance as number))[0];
 
       setTeamDistancesKm(distanceMap);
-      setRecommendedTeamName(nearest ? nearest[0] : null);
+      setRecommendedTeamName(nearestAvailable ? nearestAvailable.team : null);
       setIsCalculatingDistances(false);
     };
 
     computeDistances();
   }, [dispatchStep, selectedAlert, teams, stations, responders, vehicles]);
 
-  // ------------------------------------------------------------
-  // AUTO RESET LOGIC:
-  // A. If TEAM LEADER becomes Available → reset team + vehicle
-  // B. If ALL responders become Available → reset team + vehicle
-  // ------------------------------------------------------------
   useEffect(() => {
     if (responders.length === 0 || teams.length === 0 || vehicles.length === 0)
       return;
@@ -624,35 +706,24 @@ const AlertDispatchModal = () => {
       if (teamResponders.length === 0) return;
 
       const teamName = team.teamName;
-
-      // Find assigned vehicle
       const vehicle = vehicles.find((v) => v.assignedTeam === teamName);
-
-      // Find team leader
       const leader = teamResponders.find((r) => r.id === team.leaderId);
 
       const leaderResolved = leader && leader.status === "Available";
-      const allAvailable = teamResponders.every((r) => r.status === "Available");
-
-      // If neither condition met → DO NOTHING
-      if (!leaderResolved && !allAvailable) return;
-
-      console.log(
-        `RESET TRIGGERED → Team ${teamName}, leaderResolved=${leaderResolved}, allAvailable=${allAvailable}`
+      const allAvailable = teamResponders.every(
+        (r) => r.status === "Available",
       );
 
-      // Perform database reset
+      if (!leaderResolved && !allAvailable) return;
+
       const batch = writeBatch(db);
 
-      // Reset responders
       teamResponders.forEach((res) => {
         batch.update(doc(db, "users", res.id), { status: "Available" });
       });
 
-      // Reset team
       batch.update(doc(db, "teams", team.id), { status: "Available" });
 
-      // Reset vehicle
       if (vehicle) {
         batch.update(doc(db, "vehicles", vehicle.id), { status: "Available" });
       }
@@ -661,73 +732,50 @@ const AlertDispatchModal = () => {
     });
   }, [responders, teams, vehicles]);
 
-  // ------------------------------------------------------------
-  // GROUP USING teamName + vehicle.code
-  // ------------------------------------------------------------
-// ------------------------------------------------------------
-// GROUP LOGIC EXACTLY LIKE DispatchPage
-// ------------------------------------------------------------
-const groupedList = teams
-  .map((team) => {
-    const members = responders.filter((r) => r.teamId === team.id);
+  const sortedGroupedList = [...groupedList].sort((a: any, b: any) => {
+    const aIsRecommended = recommendedTeamName === a.team;
+    const bIsRecommended = recommendedTeamName === b.team;
 
-    if (members.length === 0) return null;
+    if (aIsRecommended && !bIsRecommended) return -1;
+    if (!aIsRecommended && bIsRecommended) return 1;
 
-    // ✅ CHECK STATION
-    const hasStation =
-      team.stationId ||
-      team.stationName ||
-      stations.some(
-        (s) =>
-          s.id === team.stationId ||
-          s.name === team.stationName
-      );
-
-    if (!hasStation) return null; // 🚨 HIDE TEAM
-
-    const vehicle =
-      vehicles.find((v) => v.assignedTeamId === team.id)?.code ||
-      vehicles.find((v) => v.assignedTeam === team.teamName)?.code ||
-      "Unassigned";
-
-    const statuses = members.map((m) => m.status);
-
-    let status = "Unavailable";
-    if (statuses.some((s) => s === "Available")) status = "Available";
-    if (statuses.every((s) => s === "Dispatched")) status = "Dispatched";
-
-    return {
-      team: team.teamName,
-      vehicle,
-      responders: members,
-      status,
+    const getPriority = (group: any) => {
+      if (group.status === "Available") return 1;
+      if (group.status === "Dispatched") return 2;
+      return 3;
     };
-  })
-  .filter(Boolean);
 
-const sortedGroupedList = [...groupedList].sort((a: any, b: any) => {
-  const aDistance = teamDistancesKm[a.team];
-  const bDistance = teamDistancesKm[b.team];
+    const aPriority = getPriority(a);
+    const bPriority = getPriority(b);
 
-  if (aDistance !== null && aDistance !== undefined && (bDistance === null || bDistance === undefined)) {
-    return -1;
-  }
+    if (aPriority !== bPriority) {
+      return aPriority - bPriority;
+    }
 
-  if (bDistance !== null && bDistance !== undefined && (aDistance === null || aDistance === undefined)) {
-    return 1;
-  }
+    const aDistance = teamDistancesKm[a.team];
+    const bDistance = teamDistancesKm[b.team];
 
-  if (aDistance !== null && aDistance !== undefined && bDistance !== null && bDistance !== undefined) {
-    return aDistance - bDistance;
-  }
+    const aHasDistance = aDistance !== null && aDistance !== undefined;
+    const bHasDistance = bDistance !== null && bDistance !== undefined;
 
-  return String(a.team).localeCompare(String(b.team));
-});
+    if (aHasDistance && !bHasDistance) return -1;
+    if (!aHasDistance && bHasDistance) return 1;
+
+    if (aHasDistance && bHasDistance) {
+      return (aDistance as number) - (bDistance as number);
+    }
+
+    return String(a.team).localeCompare(String(b.team));
+  });
 
   const incidentCounts = {
     all: alerts.length,
-    alerts: alerts.filter((item) => normalizeStatus(item.status) !== "validated").length,
-    confirmation: alerts.filter((item) => normalizeStatus(item.status) === "validated").length,
+    alerts: alerts.filter(
+      (item) => normalizeStatus(item.status) !== "validated",
+    ).length,
+    confirmation: alerts.filter(
+      (item) => normalizeStatus(item.status) === "validated",
+    ).length,
   };
 
   const visibleIncidents = alerts.filter((item) => {
@@ -736,8 +784,6 @@ const sortedGroupedList = [...groupedList].sort((a: any, b: any) => {
     if (activeIncidentTab === "confirmation") return status === "validated";
     return true;
   });
-
-
 
   const confirmIncident = async (alertItem: any) => {
     try {
@@ -750,13 +796,17 @@ const sortedGroupedList = [...groupedList].sort((a: any, b: any) => {
           if (userDoc.exists()) {
             const data = userDoc.data();
             confirmerName =
-              data.name || currentUser.displayName || currentUser.email || "Admin Panel";
+              data.name ||
+              currentUser.displayName ||
+              currentUser.email ||
+              "Admin Panel";
           } else {
             confirmerName =
               currentUser.displayName || currentUser.email || "Admin Panel";
           }
         } catch {
-          confirmerName = currentUser.displayName || currentUser.email || "Admin Panel";
+          confirmerName =
+            currentUser.displayName || currentUser.email || "Admin Panel";
         }
       }
 
@@ -768,7 +818,10 @@ const sortedGroupedList = [...groupedList].sort((a: any, b: any) => {
       });
 
       const dispatchSnap = await getDocs(
-        query(collection(db, "dispatches"), where("alertId", "==", alertItem.id))
+        query(
+          collection(db, "dispatches"),
+          where("alertId", "==", alertItem.id),
+        ),
       );
 
       if (!dispatchSnap.empty) {
@@ -830,33 +883,31 @@ const sortedGroupedList = [...groupedList].sort((a: any, b: any) => {
           alertItem.alertLocation ||
           alertItem.location ||
           "the selected fire address"
-        } has been confirmed successfully.`
+        } has been confirmed successfully.`,
       );
       setShowConfirmSuccessModal(true);
 
       setTimeout(() => {
         setShowConfirmSuccessModal(false);
-      }, 2000);
+      }, 5000);
     } catch (error) {
       console.error("Failed to confirm incident:", error);
       alert("Failed to confirm incident.");
     }
   };
 
-const getTeamStationName = (teamName: string) => {
-  const team = teams.find((t) => t.teamName === teamName);
-  if (!team) return "Unassigned";
+  const getTeamStationName = (teamName: string) => {
+    const team = teams.find((t) => t.teamName === teamName);
+    if (!team) return "Unassigned";
 
-  if (team.stationName) return team.stationName;
+    if (team.stationName) return team.stationName;
 
-  const station = stations.find((s) => team.stationId && s.id === team.stationId);
-  return station?.name || "Unassigned";
-};
+    const station = stations.find(
+      (s) => team.stationId && s.id === team.stationId,
+    );
+    return station?.name || "Unassigned";
+  };
 
-
-  // ------------------------------------------------------------
-  // STEP 1 → SELECT ALERT
-  // ------------------------------------------------------------
   const handleAlertSelect = (alert: any) => {
     setSelectedAlert(alert);
     setShowAlertPreviewModal(false);
@@ -864,11 +915,10 @@ const getTeamStationName = (teamName: string) => {
     setDispatchStep(2);
   };
 
-  // ------------------------------------------------------------
-  // STEP 2 → SELECT TEAM
-  // ------------------------------------------------------------
   const handleDispatchTeam = (group: any) => {
-    const available = group.responders.filter((r: any) => r.status === "Available");
+    const available = group.responders.filter(
+      (r: any) => r.status === "Available",
+    );
 
     if (available.length === 0) {
       alert("No available responders in this team.");
@@ -878,11 +928,6 @@ const getTeamStationName = (teamName: string) => {
     setSelectedResponderIds(new Set(available.map((r: any) => r.id)));
     setDispatchStep(3);
   };
-
-  // ------------------------------------------------------------
-  // STEP 3 → DISPATCH NOW
-  // ------------------------------------------------------------
-  // --- SAME IMPORTS ABOVE ---
 
   const dispatchResponders = async () => {
     const selected = responders.filter((r) => selectedResponderIds.has(r.id));
@@ -895,7 +940,12 @@ const getTeamStationName = (teamName: string) => {
         const userDoc = await getDoc(doc(db, "users", currentUser.uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
-          return data.name || currentUser.displayName || currentUser.email || "Admin Panel";
+          return (
+            data.name ||
+            currentUser.displayName ||
+            currentUser.email ||
+            "Admin Panel"
+          );
         }
       } catch (error) {
         console.error("Error reading dispatcher name:", error);
@@ -908,8 +958,6 @@ const getTeamStationName = (teamName: string) => {
       const baseAlertId = selectedAlert.id;
       const currentUser = auth.currentUser;
       const dispatchedByName = await getDispatcherName();
-
-      // Multiple team dispatches allowed for same incident
 
       const batch = writeBatch(db);
       const ref = doc(collection(db, "dispatches"));
@@ -953,21 +1001,16 @@ const getTeamStationName = (teamName: string) => {
         timestamp: serverTimestamp(),
       });
 
-      // Update responders → Dispatched
       selected.forEach((r) =>
-        batch.update(doc(db, "users", r.id), { status: "Dispatched" })
+        batch.update(doc(db, "users", r.id), { status: "Dispatched" }),
       );
 
-      // Update alert → Dispatched
       batch.update(doc(db, "alerts", selectedAlert.id), {
         status: "Dispatched",
         dispatchStatus: "Dispatched",
         respondedAt: serverTimestamp(),
       });
 
-      // ------------------------------------------------------------
-      // 🚒 UPDATE TEAM + VEHICLE STATUS ON DISPATCH
-      // ------------------------------------------------------------
       if (selected.length > 0) {
         const firstResponder = selected[0];
         const team = teams.find((t) => t.id === firstResponder.teamId);
@@ -980,10 +1023,11 @@ const getTeamStationName = (teamName: string) => {
         const vehicle = vehicles.find((v) => v.assignedTeam === teamName);
 
         if (vehicle) {
-          batch.update(doc(db, "vehicles", vehicle.id), { status: "Dispatched" });
+          batch.update(doc(db, "vehicles", vehicle.id), {
+            status: "Dispatched",
+          });
         }
       }
-      // ------------------------------------------------------------
 
       await batch.commit();
 
@@ -1011,7 +1055,7 @@ const getTeamStationName = (teamName: string) => {
         });
       } catch {}
 
-          if (currentUser) {
+      if (currentUser) {
         await logActivity({
           actorUid: currentUser.uid,
           actorEmail: currentUser.email || "",
@@ -1031,8 +1075,8 @@ const getTeamStationName = (teamName: string) => {
             const teamName =
               teams.find((t) => t.id === r.teamId)?.teamName || "Unassigned";
             return teamName;
-          })
-        )
+          }),
+        ),
       );
 
       setDispatchSuccessMessage(
@@ -1041,8 +1085,15 @@ const getTeamStationName = (teamName: string) => {
           selectedAlert.alertLocation ||
           selectedAlert.location ||
           "the selected fire address"
-        }.`
+        }.`,
       );
+
+      setAlertDispatchedTeams((prev) => ({
+        ...prev,
+        [baseAlertId]: Array.from(
+          new Set([...(prev[baseAlertId] || []), ...dispatchedTeamNames]),
+        ),
+      }));
 
       setShowModal(false);
       setDispatchStep(1);
@@ -1050,21 +1101,14 @@ const getTeamStationName = (teamName: string) => {
       setSelectedResponderIds(new Set());
       setShowDispatchSuccessModal(true);
 
-setTimeout(() => {
-  setShowDispatchSuccessModal(false);
-}, 2000); // 2 seconds
+      setTimeout(() => {
+        setShowDispatchSuccessModal(false);
+      }, 5000);
     } catch (error) {
       console.error("Failed to dispatch responders:", error);
       alert("Failed to dispatch responders.");
     }
   };
-  // ------------------------------------------------------------
-  // UI (unchanged)
-  // ------------------------------------------------------------
-  
- if (!showModal && !showDispatchSuccessModal && !showAlertPreviewModal && !showViewModal) {
-  return null;
-}
 
   const formattedAlertTime = previewAlert?.timestamp?.seconds
     ? new Date(previewAlert.timestamp.seconds * 1000).toLocaleString()
@@ -1080,12 +1124,7 @@ setTimeout(() => {
     if (resolvedPreviewCoords) {
       const { lat, lng } = resolvedPreviewCoords;
       const delta = 0.002;
-      const bbox = [
-        lng - delta,
-        lat - delta,
-        lng + delta,
-        lat + delta,
-      ]
+      const bbox = [lng - delta, lat - delta, lng + delta, lat + delta]
         .map((value) => value.toFixed(6))
         .join("%2C");
 
@@ -1097,10 +1136,7 @@ setTimeout(() => {
       : "";
   })();
 
-  const fireType =
-    previewAlert?.type ||
-    previewAlert?.alertType ||
-    "Unknown";
+  const fireType = previewAlert?.type || previewAlert?.alertType || "Unknown";
 
   const triggerSource =
     previewAlert?.sourceOfFire ||
@@ -1117,335 +1153,467 @@ setTimeout(() => {
     previewAlert?.message ||
     "No description provided.";
 
-  const previewImageSrc =
-    previewImageCandidates[previewImageIndex] || "";
-
-  const hasPreviewImage = Boolean(previewImageSrc);
+  const previewImageSrc = previewImageCandidates[previewImageIndex] || "";
+  const hasPreviewImage = Boolean(previewImageSrc) && !previewImageFailed;
 
   return (
-    <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
-      <div className={styles.modalWide} onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          className={styles.modalCloseIcon}
-          aria-label="Close alert dispatch modal"
+    <>
+      {showModal && (
+        <div
+          className={styles.modalOverlay}
           onClick={() => setShowModal(false)}
         >
-          ×
-        </button>
-        
-        {/* STEP 1: ALERTS */}
-        {dispatchStep === 1 && (
-          <>
-            <h3 className={styles.modalTitle}>Select Alert</h3>
+          <div
+            className={styles.modalWide}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {dispatchStep === 1 && (
+              <>
+                <div className={styles.modalHeader}>
+                  <h3 className={styles.modalTitle}>Select Alert</h3>
 
-            <div className={styles.modalTabs}>
-              <button
-                className={`${styles.modalTabBtn} ${activeIncidentTab === "all" ? styles.modalTabBtnActive : ""}`}
-                onClick={() => setActiveIncidentTab("all")}
-                type="button"
-              >
-                All ({incidentCounts.all})
-              </button>
-              <button
-                className={`${styles.modalTabBtn} ${activeIncidentTab === "alerts" ? styles.modalTabBtnActive : ""}`}
-                onClick={() => setActiveIncidentTab("alerts")}
-                type="button"
-              >
-                Alerts ({incidentCounts.alerts})
-              </button>
-              <button
-                className={`${styles.modalTabBtn} ${activeIncidentTab === "confirmation" ? styles.modalTabBtnActive : ""}`}
-                onClick={() => setActiveIncidentTab("confirmation")}
-                type="button"
-              >
-                Confirmation ({incidentCounts.confirmation})
-              </button>
-            </div>
-
-            {visibleIncidents.length === 0 && (
-              <p className={styles.distanceInfo}>No pending alerts or validated incidents found.</p>
-            )}
-
-            <div className={styles.tableScroll}>
-              <table className={styles.alertTable}>
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th>Reporter</th>
-                    <th>Contact</th>
-                    <th>Address</th>
-                    <th>Time</th> {/* NEW */}
-                    <th>Select</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {visibleIncidents.map((a) => (
-                    <tr key={a.id}>
-                      <td>{a.type}</td>
-                      <td>{a.userName}</td>
-                      <td>{a.userContact}</td>
-                      <td>{a.userAddress}</td>
-                      <td>
-  {a.timestamp?.seconds
-    ? new Date(a.timestamp.seconds * 1000).toLocaleString()
-    : "Unknown"}
-</td>
-                      <td style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-  {normalizeStatus(a.status) === "pending" && (
-    <button
-      className={styles.dispatchBtn}
-      onClick={() => handleAlertSelect(a)}
-    >
-      Dispatch
-    </button>
-  )}
-
-  {normalizeStatus(a.status) === "validated" && (
-    <button
-      className={styles.dispatchBtn}
-      onClick={() => confirmIncident(a)}
-    >
-      Confirm
-    </button>
-  )}
-
-  <button
-    className={styles.viewBtn}
-    onClick={() => {
-      setPreviewAlert(a);
-      const candidates = buildSnapshotCandidates(a);
-      setPreviewImageCandidates(candidates);
-      setPreviewImageIndex(0);
-      setPreviewImageFailed(false);
-      setShowAlertPreviewModal(true);
-    }}
-  >
-    View
-  </button>
-</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <button className={styles.closeBtn} onClick={() => setShowModal(false)}>
-              Close
-            </button>
-          </>
-        )}
-
-        {/* STEP 2: TEAM LIST */}
-        {dispatchStep === 2 && (
-          <>
-            <h3 className={styles.modalTitle}>Select Team to Dispatch</h3>
-
-            {isCalculatingDistances && (
-              <p className={styles.distanceInfo}>Calculating team proximity to selected alert...</p>
-            )}
-
-            <table className={styles.userTable}>
-              <thead>
-                <tr>
-                  <th>Team</th>
-                  <th>Station</th>
-                  <th>Vehicle</th>
-                  <th>Members</th>
-                  <th>Distance</th>
-                  <th>Status</th>
-                  <th>Dispatch</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {sortedGroupedList.map((g: any, i) => (
-                  <tr key={i}>
-                    <td>
-                      {g.team}
-                      {recommendedTeamName === g.team && (
-                        <span className={styles.recommendedBadge}>Recommended</span>
-                      )}
-                      {alreadyDispatchedTeams.has(g.team) && (
-                        <span className={styles.alreadyDispatchedBadge}>Already Dispatched</span>
-                      )}
-                    </td>
-                    <td>{getTeamStationName(g.team)}</td>
-                    <td>{g.vehicle}</td>
-                    <td>{g.responders.length}</td>
-                    <td>
-                      {teamDistancesKm[g.team] !== null && teamDistancesKm[g.team] !== undefined
-                        ? `${(teamDistancesKm[g.team] as number).toFixed(2)} km`
-                        : "N/A"}
-                    </td>
-                    <td>
+                  <div className={styles.modalTabs}>
+                    <button
+                      className={`${styles.modalTabBtn} ${
+                        activeIncidentTab === "all"
+                          ? styles.modalTabBtnActive
+                          : ""
+                      }`}
+                      onClick={() => setActiveIncidentTab("all")}
+                      type="button"
+                    >
+                      <span>All</span>
                       <span
-                        className={
-                          g.status === "Available"
-                            ? styles.statusAvailable
-                            : g.status === "Dispatched"
-                            ? styles.statusDispatched
-                            : styles.statusUnavailable
-                        }
+                        className={`${styles.modalTabBadge} ${
+                          activeIncidentTab === "all"
+                            ? styles.modalTabBadgeActive
+                            : ""
+                        }`}
                       >
-                        {g.status}
+                        {incidentCounts.all}
                       </span>
-                    </td>
-                    <td>
-  {g.status === "Available" && (
-    <button
-      className={styles.dispatchBtn}
-      onClick={() => handleDispatchTeam(g)}
-    >
-      Dispatch Team
-    </button>
-  )}
+                    </button>
 
-  {g.status === "Dispatched" && (
-    <button
-      className={styles.viewBtn}
-      onClick={() => viewDispatchInfo(g.team)}
-    >
-      View
-    </button>
-  )}
-</td>
+                    <button
+                      className={`${styles.modalTabBtn} ${
+                        activeIncidentTab === "alerts"
+                          ? styles.modalTabBtnActive
+                          : ""
+                      }`}
+                      onClick={() => setActiveIncidentTab("alerts")}
+                      type="button"
+                    >
+                      <span>Alerts</span>
+                      <span
+                        className={`${styles.modalTabBadge} ${
+                          activeIncidentTab === "alerts"
+                            ? styles.modalTabBadgeActive
+                            : ""
+                        }`}
+                      >
+                        {incidentCounts.alerts}
+                      </span>
+                    </button>
 
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    <button
+                      className={`${styles.modalTabBtn} ${
+                        activeIncidentTab === "confirmation"
+                          ? styles.modalTabBtnActive
+                          : ""
+                      }`}
+                      onClick={() => setActiveIncidentTab("confirmation")}
+                      type="button"
+                    >
+                      <span>Confirmation</span>
+                      <span
+                        className={`${styles.modalTabBadge} ${
+                          activeIncidentTab === "confirmation"
+                            ? styles.modalTabBadgeActive
+                            : ""
+                        }`}
+                      >
+                        {incidentCounts.confirmation}
+                      </span>
+                    </button>
+                  </div>
+                </div>
 
-            <button className={styles.closeBtn} onClick={() => setShowModal(false)}>
-              Cancel
-            </button>
-          </>
-        )}
+                <div className={styles.modalBody}>
+                  {visibleIncidents.length === 0 && (
+                    <p className={styles.distanceInfo}>
+                      No pending alerts or validated incidents found.
+                    </p>
+                  )}
 
-        {/* STEP 3: CONFIRM RESPONDERS */}
-        {dispatchStep === 3 && (
-          <>
-            <h3 className={styles.modalTitle}>Confirm Responders</h3>
+                  <div className={styles.tableScroll}>
+                    <table className={styles.alertTable}>
+                      <thead>
+                        <tr>
+                          <th>Type</th>
+                          <th>Reporter</th>
+                          <th>Contact</th>
+                          <th>Address</th>
+                          <th>Time</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
 
-            <table className={styles.responderTable}>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Team</th>
-                  <th>Vehicle</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
+                      <tbody>
+                        {visibleIncidents.map((a) => (
+                          <tr
+                            key={a.id}
+                            className={styles.clickableRow}
+                            onClick={() => {
+                              setPreviewAlert(a);
+                              const candidates = buildSnapshotCandidates(a);
+                              setPreviewImageCandidates(candidates);
+                              setPreviewImageIndex(0);
+                              setPreviewImageFailed(false);
+                              setShowAlertPreviewModal(true);
+                            }}
+                          >
+                            <td data-label="Type">{a.type}</td>
+                            <td data-label="Reporter">{a.userName}</td>
+                            <td data-label="Contact">{a.userContact}</td>
+                            <td data-label="Address">{a.userAddress}</td>
+                            <td data-label="Time">
+                              {a.timestamp?.seconds
+                                ? new Date(
+                                    a.timestamp.seconds * 1000,
+                                  ).toLocaleString()
+                                : "Unknown"}
+                            </td>
+                            <td
+                              data-label="Action"
+                              style={{
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center",
+                                gap: "8px",
+                                flexWrap: "wrap",
+                                minHeight: "100%",
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {normalizeStatus(a.status) === "pending" && (
+                                <button
+                                  className={styles.dispatchBtn}
+                                  onClick={() => handleAlertSelect(a)}
+                                >
+                                  Dispatch
+                                </button>
+                              )}
 
-              <tbody>
-                {responders
-                  .filter((r) => selectedResponderIds.has(r.id))
-                  .map((r) => {
-                    const teamName =
-                      teams.find((t) => t.id === r.teamId)?.teamName ||
-                      "Unassigned";
+                              {normalizeStatus(a.status) === "validated" && (
+                                <button
+                                  className={styles.dispatchBtn}
+                                  onClick={() => confirmIncident(a)}
+                                >
+                                  Confirm
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
-                    const vehicle =
-                      vehicles.find((v) => v.assignedTeam === teamName);
+                <div className={styles.modalFooter}>
+                  <button
+                    className={styles.closeBtn}
+                    onClick={() => setShowModal(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )}
 
-                    const vehicleCode = vehicle?.code || "Unassigned";
+            {dispatchStep === 2 && (
+              <>
+                <div className={styles.modalHeader}>
+                  <h3 className={styles.modalTitle}>Select Team to Dispatch</h3>
+                </div>
 
-                    return (
-                      <tr key={r.id}>
-                        <td>{r.name}</td>
-                        <td>{teamName}</td>
-                        <td>{vehicleCode}</td>
-                        <td>{r.status}</td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
+                <div className={styles.modalBody}>
+                  {isCalculatingDistances && (
+                    <p className={styles.distanceInfo}>
+                      Calculating team proximity to selected alert...
+                    </p>
+                  )}
 
-            <div className={styles.modalActions}>
-              <button className={styles.dispatchBtn} onClick={dispatchResponders}>
-                Dispatch Now
-              </button>
+                  <div className={styles.tableScroll}>
+                    <table className={styles.userTable}>
+                      <thead>
+                        <tr>
+                          <th>Team</th>
+                          <th>Station</th>
+                          <th>Vehicle</th>
+                          <th>Members</th>
+                          <th>Distance</th>
+                          <th>Status</th>
+                          <th>Dispatch</th>
+                        </tr>
+                      </thead>
 
-              <button className={styles.closeBtn} onClick={() => setShowModal(false)}>
-                Cancel
-              </button>
-            </div>
-          </>
-        )}
+                      <tbody>
+                        {sortedGroupedList.map((g: any, i) => (
+                          <tr
+                            key={i}
+                            className={
+                              g.status === "Dispatched"
+                                ? styles.clickableRow
+                                : ""
+                            }
+                            onClick={() => {
+                              if (g.status === "Dispatched") {
+                                viewDispatchInfo(g.team);
+                              }
+                            }}
+                          >
+                            <td data-label="Team">
+                              {g.team}
+                              {recommendedTeamName === g.team && (
+                                <span className={styles.recommendedBadge}>
+                                  Recommended
+                                </span>
+                              )}
+                              {alreadyDispatchedTeams.has(g.team) && (
+                                <span className={styles.alreadyDispatchedBadge}>
+                                  Already Dispatched
+                                </span>
+                              )}
+                            </td>
+                            <td data-label="Station">
+                              {getTeamStationName(g.team)}
+                            </td>
+                            <td data-label="Vehicle">{g.vehicle}</td>
+                            <td data-label="Members">{g.responders.length}</td>
+                            <td data-label="Distance">
+                              {teamDistancesKm[g.team] !== null &&
+                              teamDistancesKm[g.team] !== undefined
+                                ? `${(teamDistancesKm[g.team] as number).toFixed(2)} km`
+                                : "N/A"}
+                            </td>
+                            <td data-label="Status">
+                              <span
+                                className={
+                                  g.status === "Available"
+                                    ? styles.statusAvailable
+                                    : g.status === "Dispatched"
+                                      ? styles.statusDispatched
+                                      : styles.statusUnavailable
+                                }
+                              >
+                                {g.status}
+                              </span>
+                            </td>
+                            <td
+                              data-label="Dispatch"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {g.status === "Available" && (
+                                <button
+                                  className={styles.dispatchBtn}
+                                  onClick={() => handleDispatchTeam(g)}
+                                >
+                                  Dispatch Team
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
-      </div>
+                <div className={styles.modalFooter}>
+                  <button
+                    className={styles.closeBtn}
+                    onClick={() => setDispatchStep(1)}
+                  >
+                    Back
+                  </button>
+                </div>
+              </>
+            )}
+
+            {dispatchStep === 3 && (
+              <>
+                <div className={styles.modalHeader}>
+                  <h3 className={styles.modalTitle}>Confirm Responders</h3>
+                </div>
+
+                <div className={styles.modalBody}>
+                  <div className={styles.tableScroll}>
+                    <table className={styles.responderTable}>
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Team</th>
+                          <th>Vehicle</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {responders
+                          .filter((r) => selectedResponderIds.has(r.id))
+                          .map((r) => {
+                            const teamName =
+                              teams.find((t) => t.id === r.teamId)?.teamName ||
+                              "Unassigned";
+
+                            const vehicleCode =
+                              vehicles.find((v) => v.assignedTeam === teamName)
+                                ?.code ||
+                              vehicles.find(
+                                (v) => v.assignedTeamId === r.teamId,
+                              )?.code ||
+                              "Unassigned";
+
+                            return (
+                              <tr key={r.id}>
+                                <td data-label="Name">{r.name}</td>
+                                <td data-label="Team">{teamName}</td>
+                                <td data-label="Vehicle">{vehicleCode}</td>
+                                <td data-label="Status">
+                                  <span
+                                    className={
+                                      r.status === "Available"
+                                        ? styles.statusAvailable
+                                        : r.status === "Dispatched"
+                                          ? styles.statusDispatched
+                                          : styles.statusUnavailable
+                                    }
+                                  >
+                                    {r.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className={styles.modalFooter}>
+                  <button
+                    className={styles.closeBtn}
+                    onClick={() => setDispatchStep(2)}
+                  >
+                    Back
+                  </button>
+                  <button
+                    className={styles.dispatchBtn}
+                    onClick={dispatchResponders}
+                  >
+                    Dispatch Now
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {showAlertPreviewModal && previewAlert && (
         <div
           className={styles.modalOverlay}
           onClick={() => setShowAlertPreviewModal(false)}
         >
-          <div className={styles.modalWide} onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              className={styles.modalCloseIcon}
-              aria-label="Close alert preview"
-              onClick={() => setShowAlertPreviewModal(false)}
-            >
-              ×
-            </button>
-            <h3 className={styles.modalTitle}>Alert Snapshot</h3>
+          <div
+            className={styles.modalWide}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Alert Snapshot</h3>
+            </div>
 
-            <div className={styles.alertVisualGrid}>
-              <div className={styles.alertPreviewImageWrap}>
-                {hasPreviewImage ? (
-                  <img
-                    src={previewImageSrc}
-                    alt="Alert snapshot"
-                    className={styles.alertPreviewImage}
-                    onLoad={() => setPreviewImageFailed(false)}
-                    onError={() => {
-                      if (previewImageIndex < previewImageCandidates.length - 1) {
-                        setPreviewImageIndex((prev) => prev + 1);
-                      } else {
-                        setPreviewImageFailed(true);
-                      }
-                    }}
-                  />
-                ) : (
-                  <p className={styles.alertMapEmpty}>No snapshot available for this alert.</p>
-                )}
+            <div className={styles.modalBody}>
+              <div className={styles.snapshotTopGrid}>
+                <div className={styles.alertPreviewImageWrap}>
+                  {hasPreviewImage ? (
+                    <img
+                      src={previewImageSrc}
+                      alt="Alert snapshot"
+                      className={styles.alertPreviewImage}
+                      onLoad={() => setPreviewImageFailed(false)}
+                      onError={() => {
+                        if (
+                          previewImageIndex <
+                          previewImageCandidates.length - 1
+                        ) {
+                          setPreviewImageIndex((prev) => prev + 1);
+                        } else {
+                          setPreviewImageFailed(true);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className={styles.noImageBox}>
+                      {previewImageFailed
+                        ? "Unable to load image."
+                        : "No snapshot available."}
+                    </div>
+                  )}
+                </div>
+
+                <div className={styles.alertMapWrap}>
+                  <h4 className={styles.alertMapTitle}>Location</h4>
+                  {mapEmbedSrc ? (
+                    <iframe
+                      title="Alert location map"
+                      src={mapEmbedSrc}
+                      className={styles.alertMapFrame}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <p className={styles.alertMapEmpty}>
+                      No location map available.
+                    </p>
+                  )}
+                </div>
               </div>
 
-              <div className={styles.alertMapWrap}>
-                <h4 className={styles.alertMapTitle}>Alert Location Map</h4>
-                {mapEmbedSrc ? (
-                  <iframe
-                    title="Alert location map"
-                    className={styles.alertMapFrame}
-                    src={mapEmbedSrc}
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                ) : (
-                  <p className={styles.alertMapEmpty}>No address available for map preview.</p>
-                )}
+              <div className={styles.alertPreviewInfo}>
+                <p>
+                  <strong>Type:</strong> {fireType}
+                </p>
+                <p>
+                  <strong>Reporter:</strong>{" "}
+                  {previewAlert?.userName || "Unknown"}
+                </p>
+                <p>
+                  <strong>Contact:</strong> {previewAlert?.userContact || "N/A"}
+                </p>
+                <p>
+                  <strong>Address:</strong> {previewAddress || "N/A"}
+                </p>
+                <p>
+                  <strong>Time:</strong> {formattedAlertTime}
+                </p>
+                <p>
+                  <strong>Trigger Source:</strong> {triggerSource}
+                </p>
+                <p>
+                  <strong>Description:</strong> {fireDescription}
+                </p>
               </div>
             </div>
 
-            {hasPreviewImage && previewImageFailed && (
-              <p>
-                Snapshot preview is blocked by file permissions. Set the Google Drive file to
-                <strong> Anyone with the link</strong> and try again.
-              </p>
-            )}
+            <div className={styles.modalFooter}>
+              <button
+                className={styles.closeBtn}
+                onClick={() => setShowAlertPreviewModal(false)}
+              >
+                Close
+              </button>
 
-            <div className={styles.alertPreviewInfo}>
-              <p><strong>Fire Type:</strong> {fireType}</p>
-              <p><strong>Alert Trigger Source:</strong> {triggerSource}</p>
-              <p><strong>Description:</strong> {fireDescription}</p>
-              <p><strong>Reporter:</strong> {previewAlert.userName || "Unknown"}</p>
-              <p><strong>Contact:</strong> {previewAlert.userContact || "Unknown"}</p>
-              <p><strong>Address:</strong> {previewAlert.userAddress || "Unknown"}</p>
-            </div>
-
-            <div className={styles.modalActions}>
               {normalizeStatus(previewAlert?.status) === "pending" && (
                 <button
                   className={styles.dispatchBtn}
@@ -1454,6 +1622,7 @@ setTimeout(() => {
                   Dispatch
                 </button>
               )}
+
               {normalizeStatus(previewAlert?.status) === "validated" && (
                 <button
                   className={styles.dispatchBtn}
@@ -1462,9 +1631,95 @@ setTimeout(() => {
                   Confirm
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showViewModal && selectedDispatch && (
+        <div
+          className={styles.modalViewOverlay}
+          onClick={() => setShowViewModal(false)}
+        >
+          <div
+            className={styles.modalViewContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalViewTitle}>Dispatch Details</div>
+
+            <div className={styles.modalViewBody}>
+              <div className={styles.modalDetails}>
+                <p>
+                  <strong>Alert Type:</strong>{" "}
+                  {selectedDispatch.alertType || "Fire Alert"}
+                </p>
+                <p>
+                  <strong>Address:</strong>{" "}
+                  {selectedDispatch.userAddress ||
+                    selectedDispatch.alertLocation ||
+                    "N/A"}
+                </p>
+                <p>
+                  <strong>Reported By:</strong>{" "}
+                  {selectedDispatch.userReported || "Unknown"}
+                </p>
+                <p>
+                  <strong>Contact:</strong>{" "}
+                  {selectedDispatch.userContact || "N/A"}
+                </p>
+                <p>
+                  <strong>Status:</strong> {selectedDispatch.status || "N/A"}
+                </p>
+                <p>
+                  <strong>Dispatched By:</strong>{" "}
+                  {selectedDispatch.dispatchedBy || "N/A"}
+                </p>
+                <p>
+                  <strong>Timestamp:</strong>{" "}
+                  {selectedDispatch.timestamp?.seconds
+                    ? new Date(
+                        selectedDispatch.timestamp.seconds * 1000,
+                      ).toLocaleString()
+                    : "Unknown"}
+                </p>
+              </div>
+
+              <div className={styles.tableScroll}>
+                <table className={styles.responderTable}>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Team</th>
+                      <th>Vehicle</th>
+                      <th>Contact</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(selectedDispatch.responders || []).map(
+                      (responder: any, index: number) => (
+                        <tr key={responder.id || index}>
+                          <td data-label="Name">{responder.name || "N/A"}</td>
+                          <td data-label="Team">
+                            {responder.team || responder.teamName || "N/A"}
+                          </td>
+                          <td data-label="Vehicle">
+                            {responder.vehicle || "N/A"}
+                          </td>
+                          <td data-label="Contact">
+                            {responder.contact || "N/A"}
+                          </td>
+                        </tr>
+                      ),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className={styles.modalViewActions}>
               <button
                 className={styles.closeBtn}
-                onClick={() => setShowAlertPreviewModal(false)}
+                onClick={() => setShowViewModal(false)}
               >
                 Close
               </button>
@@ -1472,124 +1727,45 @@ setTimeout(() => {
           </div>
         </div>
       )}
-      {showViewModal && selectedDispatch && (
-  <div className={styles.modalOverlay} onClick={() => setShowViewModal(false)}>
-    <div className={styles.modalWide} onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        className={styles.modalCloseIcon}
-        aria-label="Close dispatch details"
-        onClick={() => setShowViewModal(false)}
-      >
-        ×
-      </button>
-      <h3 className={styles.modalTitle}>Dispatch Details</h3>
 
-      <p><strong>Alert Type:</strong> {selectedDispatch.alertType}</p>
-      <p><strong>Location:</strong> {selectedDispatch.alertLocation}</p>
-      <p><strong>Dispatched By:</strong> {selectedDispatch.dispatchedBy}</p>
+      {showDispatchSuccessModal && (
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setShowDispatchSuccessModal(false)}
+        >
+          <div
+            className={styles.successModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className={styles.successTitle}>Success</h3>
+            <p className={styles.successMessage}>{dispatchSuccessMessage}</p>
+            <button
+              className={styles.successCloseBtn}
+              onClick={() => setShowDispatchSuccessModal(false)}
+            >
+              Okay
+            </button>
+          </div>
+        </div>
+      )}
 
-      <p>
-        <strong>Time:</strong>{" "}
-        {selectedDispatch.timestamp
-          ? new Date(
-              selectedDispatch.timestamp.seconds * 1000
-            ).toLocaleString()
-          : "—"}
-      </p>
-
-      <hr className={styles.separator} />
-
-      <h4>Reported By</h4>
-      <p><strong>Name:</strong> {selectedDispatch.userReported}</p>
-      <p><strong>Contact:</strong> {selectedDispatch.userContact}</p>
-      <p><strong>Email:</strong> {selectedDispatch.userEmail}</p>
-      <p><strong>Address:</strong> {selectedDispatch.userAddress}</p>
-
-      <hr className={styles.separator} />
-
-      <h4>Responders</h4>
-      <ul>
-        {selectedDispatch.responders?.map((r: any) => (
-          <li key={r.id}>
-            {r.name} — {r.team} ({r.vehicle})
-          </li>
-        ))}
-      </ul>
-
-      <button
-        className={styles.closeBtn}
-        onClick={() => setShowViewModal(false)}
-      >
-        Close
-      </button>
-    </div>
-  </div>
-
-  
-)}
-
-{showDispatchSuccessModal && (
-  <div
-    className={styles.modalOverlay}
-    onClick={() => setShowDispatchSuccessModal(false)}
-  >
-    <div
-      className={styles.modalWide}
-      onClick={(e) => e.stopPropagation()}
-      style={{
-        width: "400px",
-        maxWidth: "90%",
-        textAlign: "center",
-        padding: "24px",
-      }}
-    >
-      <h3 className={styles.modalTitle}>Dispatch Successful</h3>
-
-      <p style={{ marginTop: "10px" }}>
-        {dispatchSuccessMessage || "Responders have been dispatched successfully."}
-      </p>
-
-      <p style={{ fontSize: "12px", color: "#888", marginTop: "10px" }}>
-        This will close automatically...
-      </p>
-    </div>
-  </div>
-)}
-
-{showConfirmSuccessModal && (
-  <div
-    className={styles.modalOverlay}
-    onClick={() => setShowConfirmSuccessModal(false)}
-  >
-    <div
-      className={styles.modalWide}
-      onClick={(e) => e.stopPropagation()}
-      style={{
-        width: "400px",
-        maxWidth: "90%",
-        textAlign: "center",
-        padding: "24px",
-      }}
-    >
-      <h3 className={styles.modalTitle}>Confirmation Successful</h3>
-
-      <p style={{ marginTop: "10px" }}>
-        {confirmSuccessMessage || "Incident confirmed successfully."}
-      </p>
-
-      <p style={{ fontSize: "12px", color: "#888", marginTop: "10px" }}>
-        This will close automatically...
-      </p>
-    </div>
-  </div>
-)}
-    </div>
-    
+      {showConfirmSuccessModal && (
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setShowConfirmSuccessModal(false)}
+        >
+          <div
+            className={styles.successModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+           
+            <h3 className={styles.successTitle}>Confirmed</h3>
+            <p className={styles.successMessage}>{confirmSuccessMessage}</p>
+          </div>
+        </div>
+      )}
+    </>
   );
-
-  
-  
 };
 
 export default AlertDispatchModal;

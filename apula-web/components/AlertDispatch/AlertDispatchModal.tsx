@@ -365,37 +365,55 @@ const AlertDispatchModal = () => {
 
     setAlerts(nextAlerts);
 
-    const dispatchSnap = await getDocs(collection(db, "dispatches"));
-    const dispatchedMap: Record<string, string[]> = {};
+   const loadAlertDispatchedTeams = async () => {
+  const dispatchSnap = await getDocs(collection(db, "dispatches"));
+  const dispatchedMap: Record<string, string[]> = {};
 
-    dispatchSnap.docs.forEach((docSnap) => {
-      const data = docSnap.data() as any;
+  dispatchSnap.docs.forEach((docSnap) => {
+    const data = docSnap.data() as any;
+    const status = normalizeStatus(data?.status);
 
-      if (normalizeStatus(data?.status) !== "dispatched") return;
+    // include active dispatch-related statuses only
+    if (!["dispatched", "validated", "confirmed"].includes(status)) return;
 
-      const alertId = String(data?.alertId || "").trim();
-      if (!alertId) return;
+    const alertId = String(data?.alertId || "").trim();
+    if (!alertId) return;
 
-      const teamNames = Array.from(
-        new Set(
-          (data?.responders || [])
-            .map((r: any) => r?.team || r?.teamName)
-            .filter(Boolean)
-            .map((name: string) => String(name)),
-        ),
-      );
+    const teamNames = Array.from(
+      new Set(
+        [
+          // from responders array
+          ...((data?.responders || []).map((r: any) =>
+            String(
+              r?.teamName ||
+              r?.team ||
+              r?.assignedTeamName ||
+              r?.assignedTeam ||
+              ""
+            ).trim()
+          )),
 
-      if (!dispatchedMap[alertId]) {
-        dispatchedMap[alertId] = [];
-      }
+          // fallback direct fields on dispatch doc
+          String(data?.teamName || "").trim(),
+          ...(Array.isArray(data?.teamNames)
+            ? data.teamNames.map((name: any) => String(name).trim())
+            : []),
+        ].filter(Boolean)
+      )
+    );
 
-      dispatchedMap[alertId] = Array.from(
-        new Set([...dispatchedMap[alertId], ...teamNames]),
-      );
-    });
+    if (!dispatchedMap[alertId]) {
+      dispatchedMap[alertId] = [];
+    }
 
-    setAlertDispatchedTeams(dispatchedMap);
-  };
+    dispatchedMap[alertId] = Array.from(
+      new Set([...dispatchedMap[alertId], ...teamNames])
+    );
+  });
+
+  setAlertDispatchedTeams(dispatchedMap);
+};
+  }
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -1737,14 +1755,10 @@ const AlertDispatchModal = () => {
             className={styles.successModal}
             onClick={(e) => e.stopPropagation()}
           >
+            
             <h3 className={styles.successTitle}>Success</h3>
             <p className={styles.successMessage}>{dispatchSuccessMessage}</p>
-            <button
-              className={styles.successCloseBtn}
-              onClick={() => setShowDispatchSuccessModal(false)}
-            >
-              Okay
-            </button>
+            
           </div>
         </div>
       )}

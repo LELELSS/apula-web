@@ -471,6 +471,15 @@
   white-space: nowrap;
 }
 
+.sectionHeading {
+  font-size: 15px;
+  font-weight: 700;
+  color: #a30000;
+  margin-bottom: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eee;
+}
+
 /* Animations */
 @keyframes fadeIn {
   from { opacity: 0; }

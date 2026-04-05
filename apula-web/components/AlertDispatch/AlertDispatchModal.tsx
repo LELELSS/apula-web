@@ -120,6 +120,7 @@ const AlertDispatchModal = () => {
 
   const [selectedDispatch, setSelectedDispatch] = useState<any>(null);
   const [showViewModal, setShowViewModal] = useState(false);
+
   const [previewAlert, setPreviewAlert] = useState<any>(null);
   const [showAlertPreviewModal, setShowAlertPreviewModal] = useState(false);
   const [previewImageCandidates, setPreviewImageCandidates] = useState<
@@ -131,6 +132,9 @@ const AlertDispatchModal = () => {
     lat: number;
     lng: number;
   } | null>(null);
+  const [previewDetailTab, setPreviewDetailTab] = useState<
+    "validation" | "alert"
+  >("validation");
 
   const [showDispatchSuccessModal, setShowDispatchSuccessModal] =
     useState(false);
@@ -206,6 +210,62 @@ const AlertDispatchModal = () => {
       normalizeBase64Snapshot(alertData?.snapshot);
 
     return base64Data ? [base64Data] : [];
+  };
+
+  const getValidationReport = (alertData: any) => {
+    return (
+      alertData?.latestValidationReport || alertData?.validationReport || null
+    );
+  };
+
+  const formatListValue = (value: unknown, fallback = "N/A") => {
+    if (Array.isArray(value)) {
+      const cleaned = value
+        .map((item) => String(item || "").trim())
+        .filter(Boolean);
+      return cleaned.length ? cleaned.join(", ") : fallback;
+    }
+
+    const text = String(value || "").trim();
+    return text || fallback;
+  };
+
+  const formatBool = (value: unknown) => (value === true ? "Yes" : "No");
+
+  const getValidationImageSrc = (alertData: any) => {
+    const validation = getValidationReport(alertData);
+    if (!validation) return "";
+
+    const base64Image = normalizeBase64Snapshot(
+      validation?.actualFireImageBase64 ||
+        validation?.actualFireImage ||
+        validation?.validationImageBase64 ||
+        validation?.imageBase64,
+    );
+
+    if (base64Image) return base64Image;
+
+    const urlImage =
+      validation?.actualFireImageUrl ||
+      validation?.validationImageUrl ||
+      validation?.imageUrl ||
+      "";
+
+    return typeof urlImage === "string" ? urlImage.trim() : "";
+  };
+
+  const openAlertPreview = (alertData: any) => {
+    setPreviewAlert(alertData);
+
+    const snapshotCandidates = buildSnapshotCandidates(alertData);
+    setPreviewImageCandidates(snapshotCandidates);
+
+    setPreviewImageIndex(0);
+    setPreviewImageFailed(false);
+    setPreviewDetailTab(
+      getValidationReport(alertData) ? "validation" : "alert",
+    );
+    setShowAlertPreviewModal(true);
   };
 
   useEffect(() => {
@@ -365,55 +425,53 @@ const AlertDispatchModal = () => {
 
     setAlerts(nextAlerts);
 
-   const loadAlertDispatchedTeams = async () => {
-  const dispatchSnap = await getDocs(collection(db, "dispatches"));
-  const dispatchedMap: Record<string, string[]> = {};
+    const loadAlertDispatchedTeams = async () => {
+      const dispatchSnap = await getDocs(collection(db, "dispatches"));
+      const dispatchedMap: Record<string, string[]> = {};
 
-  dispatchSnap.docs.forEach((docSnap) => {
-    const data = docSnap.data() as any;
-    const status = normalizeStatus(data?.status);
+      dispatchSnap.docs.forEach((docSnap) => {
+        const data = docSnap.data() as any;
+        const status = normalizeStatus(data?.status);
 
-    // include active dispatch-related statuses only
-    if (!["dispatched", "validated", "confirmed"].includes(status)) return;
+        if (!["dispatched", "validated", "confirmed"].includes(status)) return;
 
-    const alertId = String(data?.alertId || "").trim();
-    if (!alertId) return;
+        const alertId = String(data?.alertId || "").trim();
+        if (!alertId) return;
 
-    const teamNames = Array.from(
-      new Set(
-        [
-          // from responders array
-          ...((data?.responders || []).map((r: any) =>
-            String(
-              r?.teamName ||
-              r?.team ||
-              r?.assignedTeamName ||
-              r?.assignedTeam ||
-              ""
-            ).trim()
-          )),
+        const teamNames = Array.from(
+          new Set(
+            [
+              ...(data?.responders || []).map((r: any) =>
+                String(
+                  r?.teamName ||
+                    r?.team ||
+                    r?.assignedTeamName ||
+                    r?.assignedTeam ||
+                    "",
+                ).trim(),
+              ),
+              String(data?.teamName || "").trim(),
+              ...(Array.isArray(data?.teamNames)
+                ? data.teamNames.map((name: any) => String(name).trim())
+                : []),
+            ].filter(Boolean),
+          ),
+        );
 
-          // fallback direct fields on dispatch doc
-          String(data?.teamName || "").trim(),
-          ...(Array.isArray(data?.teamNames)
-            ? data.teamNames.map((name: any) => String(name).trim())
-            : []),
-        ].filter(Boolean)
-      )
-    );
+        if (!dispatchedMap[alertId]) {
+          dispatchedMap[alertId] = [];
+        }
 
-    if (!dispatchedMap[alertId]) {
-      dispatchedMap[alertId] = [];
-    }
+        dispatchedMap[alertId] = Array.from(
+          new Set([...dispatchedMap[alertId], ...teamNames]),
+        );
+      });
 
-    dispatchedMap[alertId] = Array.from(
-      new Set([...dispatchedMap[alertId], ...teamNames])
-    );
-  });
+      setAlertDispatchedTeams(dispatchedMap);
+    };
 
-  setAlertDispatchedTeams(dispatchedMap);
-};
-  }
+    await loadAlertDispatchedTeams();
+  };
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -904,6 +962,7 @@ const AlertDispatchModal = () => {
         } has been confirmed successfully.`,
       );
       setShowConfirmSuccessModal(true);
+      setShowAlertPreviewModal(false);
 
       setTimeout(() => {
         setShowConfirmSuccessModal(false);
@@ -1173,6 +1232,10 @@ const AlertDispatchModal = () => {
 
   const previewImageSrc = previewImageCandidates[previewImageIndex] || "";
   const hasPreviewImage = Boolean(previewImageSrc) && !previewImageFailed;
+  const validationImageSrc = previewAlert
+    ? getValidationImageSrc(previewAlert)
+    : "";
+  const hasValidationImage = Boolean(validationImageSrc);
 
   return (
     <>
@@ -1281,14 +1344,7 @@ const AlertDispatchModal = () => {
                           <tr
                             key={a.id}
                             className={styles.clickableRow}
-                            onClick={() => {
-                              setPreviewAlert(a);
-                              const candidates = buildSnapshotCandidates(a);
-                              setPreviewImageCandidates(candidates);
-                              setPreviewImageIndex(0);
-                              setPreviewImageFailed(false);
-                              setShowAlertPreviewModal(true);
-                            }}
+                            onClick={() => openAlertPreview(a)}
                           >
                             <td data-label="Type">{a.type}</td>
                             <td data-label="Reporter">{a.userName}</td>
@@ -1325,7 +1381,7 @@ const AlertDispatchModal = () => {
                               {normalizeStatus(a.status) === "validated" && (
                                 <button
                                   className={styles.dispatchBtn}
-                                  onClick={() => confirmIncident(a)}
+                                  onClick={() => openAlertPreview(a)}
                                 >
                                   Confirm
                                 </button>
@@ -1549,79 +1605,183 @@ const AlertDispatchModal = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Alert Snapshot</h3>
+              <h3 className={styles.modalTitle}>Validation Review</h3>
+
+              <div className={styles.previewToggleWrap}>
+                <button
+                  type="button"
+                  className={`${styles.previewToggleBtn} ${
+                    previewDetailTab === "validation"
+                      ? styles.previewToggleBtnActive
+                      : ""
+                  }`}
+                  onClick={() => setPreviewDetailTab("validation")}
+                >
+                  Validation Report
+                </button>
+
+                <button
+                  type="button"
+                  className={`${styles.previewToggleBtn} ${
+                    previewDetailTab === "alert"
+                      ? styles.previewToggleBtnActive
+                      : ""
+                  }`}
+                  onClick={() => setPreviewDetailTab("alert")}
+                >
+                  Alert Details
+                </button>
+              </div>
             </div>
 
             <div className={styles.modalBody}>
-              <div className={styles.snapshotTopGrid}>
-                <div className={styles.alertPreviewImageWrap}>
-                  {hasPreviewImage ? (
-                    <img
-                      src={previewImageSrc}
-                      alt="Alert snapshot"
-                      className={styles.alertPreviewImage}
-                      onLoad={() => setPreviewImageFailed(false)}
-                      onError={() => {
-                        if (
-                          previewImageIndex <
-                          previewImageCandidates.length - 1
-                        ) {
-                          setPreviewImageIndex((prev) => prev + 1);
-                        } else {
-                          setPreviewImageFailed(true);
-                        }
-                      }}
-                    />
-                  ) : (
-                    <div className={styles.noImageBox}>
-                      {previewImageFailed
-                        ? "Unable to load image."
-                        : "No snapshot available."}
+              {previewDetailTab === "validation" ? (
+                <>
+                  <div className={styles.validationGrid}>
+                    <div className={styles.validationImageWrap}>
+                      {hasValidationImage ? (
+                        <img
+                          src={validationImageSrc}
+                          alt="Validation"
+                          className={styles.validationImage}
+                        />
+                      ) : (
+                        <div className={styles.validationNoImage}>
+                          No validation image available.
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                <div className={styles.alertMapWrap}>
-                  <h4 className={styles.alertMapTitle}>Location</h4>
-                  {mapEmbedSrc ? (
-                    <iframe
-                      title="Alert location map"
-                      src={mapEmbedSrc}
-                      className={styles.alertMapFrame}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <p className={styles.alertMapEmpty}>
-                      No location map available.
+                    <div className={styles.validationDetails}>
+                      {getValidationReport(previewAlert) ? (
+                        getValidationReport(previewAlert)
+                          ?.skippedBecauseRadioed ? (
+                          <p>
+                            <strong>Validated By:</strong>{" "}
+                            {getValidationReport(previewAlert)?.validatedBy ||
+                              "N/A"}
+                          </p>
+                        ) : (
+                          <>
+                            <p>
+                              <strong>Validated By:</strong>{" "}
+                              {getValidationReport(previewAlert)?.validatedBy ||
+                                "N/A"}
+                            </p>
+                            <p>
+                              <strong>Fire Type:</strong>{" "}
+                              {formatListValue(
+                                getValidationReport(previewAlert)?.fireTypes,
+                              )}
+                            </p>
+                            <p>
+                              <strong>Source of Fire:</strong>{" "}
+                              {formatListValue(
+                                getValidationReport(previewAlert)?.sourceOfFire,
+                              )}
+                            </p>
+                            <p>
+                              <strong>Injured / Trapped:</strong>{" "}
+                              {formatBool(
+                                getValidationReport(previewAlert)
+                                  ?.injuredOrTrapped,
+                              )}
+                            </p>
+                            <p>
+                              <strong>Resources Needed:</strong>{" "}
+                              {formatListValue(
+                                getValidationReport(previewAlert)
+                                  ?.resourcesNeeded,
+                              )}
+                            </p>
+                            <p>
+                              <strong>Remarks:</strong>{" "}
+                              {formatListValue(
+                                getValidationReport(previewAlert)?.remarks,
+                              )}
+                            </p>
+                          </>
+                        )
+                      ) : (
+                        <p>No validation report available.</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className={styles.snapshotTopGrid}>
+                    <div className={styles.alertPreviewImageWrap}>
+                      {hasPreviewImage ? (
+                        <img
+                          src={previewImageSrc}
+                          alt="Alert snapshot"
+                          className={styles.alertPreviewImage}
+                          onLoad={() => setPreviewImageFailed(false)}
+                          onError={() => {
+                            if (
+                              previewImageIndex <
+                              previewImageCandidates.length - 1
+                            ) {
+                              setPreviewImageIndex((prev) => prev + 1);
+                            } else {
+                              setPreviewImageFailed(true);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <div className={styles.noImageBox}>
+                          {previewImageFailed
+                            ? "Unable to load image."
+                            : "No snapshot available."}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className={styles.alertMapWrap}>
+                      <h4 className={styles.alertMapTitle}>Location</h4>
+                      {mapEmbedSrc ? (
+                        <iframe
+                          title="Alert location map"
+                          src={mapEmbedSrc}
+                          className={styles.alertMapFrame}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <p className={styles.alertMapEmpty}>
+                          No location map available.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className={styles.alertPreviewInfo}>
+                    <p>
+                      <strong>Type:</strong> {fireType}
                     </p>
-                  )}
-                </div>
-              </div>
-
-              <div className={styles.alertPreviewInfo}>
-                <p>
-                  <strong>Type:</strong> {fireType}
-                </p>
-                <p>
-                  <strong>Reporter:</strong>{" "}
-                  {previewAlert?.userName || "Unknown"}
-                </p>
-                <p>
-                  <strong>Contact:</strong> {previewAlert?.userContact || "N/A"}
-                </p>
-                <p>
-                  <strong>Address:</strong> {previewAddress || "N/A"}
-                </p>
-                <p>
-                  <strong>Time:</strong> {formattedAlertTime}
-                </p>
-                <p>
-                  <strong>Trigger Source:</strong> {triggerSource}
-                </p>
-                <p>
-                  <strong>Description:</strong> {fireDescription}
-                </p>
-              </div>
+                    <p>
+                      <strong>Reporter:</strong>{" "}
+                      {previewAlert?.userName || "Unknown"}
+                    </p>
+                    <p>
+                      <strong>Contact:</strong>{" "}
+                      {previewAlert?.userContact || "N/A"}
+                    </p>
+                    <p>
+                      <strong>Address:</strong> {previewAddress || "N/A"}
+                    </p>
+                    <p>
+                      <strong>Time:</strong> {formattedAlertTime}
+                    </p>
+                    <p>
+                      <strong>Trigger Source:</strong> {triggerSource}
+                    </p>
+                    <p>
+                      <strong>Description:</strong> {fireDescription}
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className={styles.modalFooter}>
@@ -1755,10 +1915,8 @@ const AlertDispatchModal = () => {
             className={styles.successModal}
             onClick={(e) => e.stopPropagation()}
           >
-            
             <h3 className={styles.successTitle}>Success</h3>
             <p className={styles.successMessage}>{dispatchSuccessMessage}</p>
-            
           </div>
         </div>
       )}
@@ -1772,7 +1930,6 @@ const AlertDispatchModal = () => {
             className={styles.successModal}
             onClick={(e) => e.stopPropagation()}
           >
-           
             <h3 className={styles.successTitle}>Confirmed</h3>
             <p className={styles.successMessage}>{confirmSuccessMessage}</p>
           </div>

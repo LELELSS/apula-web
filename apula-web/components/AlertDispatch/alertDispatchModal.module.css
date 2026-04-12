@@ -138,6 +138,48 @@
   display: inline-block;
 }
 
+.statusPending {
+  background: #fff4e5;
+  color: #b26a00;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.statusValidated {
+  background: #e8f0ff;
+  color: #1d4ed8;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.typeWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.typeText {
+  font-weight: 600;
+  color: #1c1c1e;
+  font-size: 14px;
+}
+
+.typeBadge {
+  background: #ffe5e5;
+  color: #dc2626;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  width: fit-content;
+}
+
 .snapshotTopGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -404,6 +446,25 @@
   padding: 20px 20px 14px;
   border-bottom: 1px solid #e5e7eb;
   background: #fff;
+}
+
+.modalHeaderTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.dispatchedHeaderBadge {
+  background: #ffe6e6;
+  color: #a30000;
+  border: 0px solid #bfdbfe;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .modalTitle {
@@ -703,15 +764,21 @@
 
 .validationImageWrap {
   width: 100%;
+  height: 360px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #111; /* better for small images */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .validationImage {
   width: 100%;
-  max-height: 360px;
-  object-fit: cover;
-  border-radius: 10px;
-  border: 1px solid #e5e7eb;
-  display: block;
+  height: 100%;
+  object-fit: contain; /* keeps full image */
+  image-rendering: auto; /* smooth scaling */
 }
 
 .validationNoImage {
@@ -826,6 +893,35 @@
 
   .modalFooter {
     flex-wrap: wrap;
+  }
+
+  .modalTabs {
+    flex-wrap: nowrap;           /* ❗ force 1 row */
+    justify-content: space-between;
+    overflow: hidden;            /* ❗ no horizontal scroll */
+    gap: 6px;
+  }
+
+  .modalTabBtn {
+    flex: 1;                     
+    min-width: 0;              
+    padding: 6px 6px;
+    font-size: 12px;
+    justify-content: center;    
+    gap: 4px;
+  }
+
+  .modalTabBtn span:first-child {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;     
+  }
+
+  .modalTabBadge {
+    min-width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
+    padding: 0 6px;
   }
 
   .closeBtn,

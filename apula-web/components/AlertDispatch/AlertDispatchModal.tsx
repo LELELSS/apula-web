@@ -84,6 +84,31 @@ const normalizeIncident = (id: string, data: any) => {
   };
 };
 
+const getBaseType = (alert: any) => {
+  const typeRaw = (alert?.type || alert?.alertType || "").toLowerCase();
+
+  if (typeRaw.includes("panic")) return "Manual Alert";
+  return "Fire Alert";
+};
+
+const getTypeBadge = (alert: any) => {
+  const typeRaw = (alert?.type || alert?.alertType || "").toLowerCase();
+
+  if (typeRaw.includes("panic")) {
+    return "Manual alert";
+  }
+
+  if (typeRaw.includes("confirmed")) {
+    return "Confirmed by user";
+  }
+
+  if (typeRaw.includes("no user response") || typeRaw.includes("unverified")) {
+    return "No user response";
+  }
+
+  return null;
+};
+
 const AlertDispatchModal = () => {
   const [showModal, setShowModal] = useState(false);
   const [activeIncidentTab, setActiveIncidentTab] = useState<
@@ -120,6 +145,7 @@ const AlertDispatchModal = () => {
 
   const [selectedDispatch, setSelectedDispatch] = useState<any>(null);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [dispatchInfo, setDispatchInfo] = useState<any>(null);
 
   const [previewAlert, setPreviewAlert] = useState<any>(null);
   const [showAlertPreviewModal, setShowAlertPreviewModal] = useState(false);
@@ -134,7 +160,7 @@ const AlertDispatchModal = () => {
   } | null>(null);
   const [previewDetailTab, setPreviewDetailTab] = useState<
     "validation" | "alert"
-  >("validation");
+  >("alert");
 
   const [showDispatchSuccessModal, setShowDispatchSuccessModal] =
     useState(false);
@@ -145,6 +171,44 @@ const AlertDispatchModal = () => {
   const [alertDispatchedTeams, setAlertDispatchedTeams] = useState<
     Record<string, string[]>
   >({});
+
+  const formatStatusWithTeam = (alert: any) => {
+    const status = normalizeStatus(alert?.status);
+
+    if (status !== "dispatched") {
+      return alert?.status || "Unknown";
+    }
+
+    const dispatchedTeams = alertDispatchedTeams[alert.id] || [];
+
+    if (dispatchedTeams.length === 0) {
+      return "Dispatched";
+    }
+
+    if (dispatchedTeams.length === 1) {
+      return `Dispatched Team ${dispatchedTeams[0]}`;
+    }
+
+    return `Dispatched (${dispatchedTeams.join(", ")})`;
+  };
+
+  const getDispatchedTeamBadge = (alert: any) => {
+    const status = normalizeStatus(alert?.status);
+
+    if (status !== "dispatched") return null;
+
+    const dispatchedTeams = alertDispatchedTeams[alert.id] || [];
+
+    if (dispatchedTeams.length === 0) {
+      return "Dispatched";
+    }
+
+    if (dispatchedTeams.length === 1) {
+      return `Dispatched Team ${dispatchedTeams[0]}`;
+    }
+
+    return `Dispatched (${dispatchedTeams.join(", ")})`;
+  };
 
   const extractGoogleDriveFileId = (url: string): string | null => {
     const filePathMatch = url.match(/\/file\/d\/([^/]+)/);
@@ -232,6 +296,89 @@ const AlertDispatchModal = () => {
 
   const formatBool = (value: unknown) => (value === true ? "Yes" : "No");
 
+  const hasDisplayValue = (value: unknown) => {
+    if (Array.isArray(value)) {
+      return value.some((item) => String(item || "").trim());
+    }
+
+    if (typeof value === "boolean") {
+      return true;
+    }
+
+    return String(value || "").trim().length > 0;
+  };
+
+  const formatValidationTime = (value: any) => {
+    if (!value) return "";
+
+    try {
+      if (typeof value?.toMillis === "function") {
+        return new Date(value.toMillis()).toLocaleString();
+      }
+
+      if (typeof value?.seconds === "number") {
+        return new Date(value.seconds * 1000).toLocaleString();
+      }
+
+      const parsed = new Date(value);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toLocaleString();
+      }
+    } catch {}
+
+    return "";
+  };
+
+  const getDispatchInfo = async (alertId: string) => {
+    const snap = await getDocs(
+      query(collection(db, "dispatches"), where("alertId", "==", alertId)),
+    );
+
+    if (snap.empty) return null;
+
+    // get latest dispatch
+    const latest = snap.docs
+      .map((d) => d.data())
+      .sort(
+        (a: any, b: any) =>
+          timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp),
+      )[0];
+
+    return latest;
+  };
+
+  const formatDispatchTime = (value: any) => {
+    if (!value) return "";
+
+    try {
+      if (typeof value?.toMillis === "function") {
+        return new Date(value.toMillis()).toLocaleString();
+      }
+
+      if (typeof value?.seconds === "number") {
+        return new Date(value.seconds * 1000).toLocaleString();
+      }
+
+      const parsed = new Date(value);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toLocaleString();
+      }
+    } catch {}
+
+    return "";
+  };
+
+  const getValidationTimeValue = (alertData: any) => {
+    const validation = getValidationReport(alertData);
+    return (
+      validation?.validatedAt ||
+      validation?.submittedAt ||
+      alertData?.validationFormSubmittedAt ||
+      alertData?.latestValidationSubmittedAt ||
+      null
+    );
+  };
+
   const getValidationImageSrc = (alertData: any) => {
     const validation = getValidationReport(alertData);
     if (!validation) return "";
@@ -254,7 +401,7 @@ const AlertDispatchModal = () => {
     return typeof urlImage === "string" ? urlImage.trim() : "";
   };
 
-  const openAlertPreview = (alertData: any) => {
+  const openAlertPreview = async (alertData: any) => {
     setPreviewAlert(alertData);
 
     const snapshotCandidates = buildSnapshotCandidates(alertData);
@@ -262,9 +409,14 @@ const AlertDispatchModal = () => {
 
     setPreviewImageIndex(0);
     setPreviewImageFailed(false);
-    setPreviewDetailTab(
-      getValidationReport(alertData) ? "validation" : "alert",
-    );
+
+    const status = normalizeStatus(alertData?.status);
+    setPreviewDetailTab(status === "validated" ? "validation" : "alert");
+
+    // ✅ NEW: load dispatch info
+    const dispatch = await getDispatchInfo(alertData.id);
+    setDispatchInfo(dispatch);
+
     setShowAlertPreviewModal(true);
   };
 
@@ -390,8 +542,16 @@ const AlertDispatchModal = () => {
   };
 
   useEffect(() => {
+    if (!showModal) return;
+
+    const unsubscribe = loadAlerts();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [showModal]);
+
+  useEffect(() => {
     const openModal = () => {
-      loadAlerts();
       setDispatchStep(1);
       setActiveIncidentTab("all");
       setSelectedAlert(null);
@@ -403,74 +563,85 @@ const AlertDispatchModal = () => {
     return () => window.removeEventListener("open-alert-dispatch", openModal);
   }, []);
 
-  const loadAlerts = async () => {
-    const alertSnap = await getDocs(
-      query(collection(db, "alerts"), orderBy("timestamp", "desc")),
+  const loadAlerts = () => {
+    const alertsQuery = query(
+      collection(db, "alerts"),
+      orderBy("timestamp", "desc"),
     );
 
-    const nextAlerts = alertSnap.docs
-      .map((d) => normalizeIncident(d.id, d.data()))
-      .filter((item) => {
-        const status = normalizeStatus(item.status);
-        return (
-          status === "pending" ||
-          status === "dispatched" ||
-          status === "validated"
-        );
-      })
-      .sort(
-        (a, b) =>
-          timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp),
-      );
-
-    setAlerts(nextAlerts);
-
-    const loadAlertDispatchedTeams = async () => {
-      const dispatchSnap = await getDocs(collection(db, "dispatches"));
-      const dispatchedMap: Record<string, string[]> = {};
-
-      dispatchSnap.docs.forEach((docSnap) => {
-        const data = docSnap.data() as any;
-        const status = normalizeStatus(data?.status);
-
-        if (!["dispatched", "validated", "confirmed"].includes(status)) return;
-
-        const alertId = String(data?.alertId || "").trim();
-        if (!alertId) return;
-
-        const teamNames = Array.from(
-          new Set(
-            [
-              ...(data?.responders || []).map((r: any) =>
-                String(
-                  r?.teamName ||
-                    r?.team ||
-                    r?.assignedTeamName ||
-                    r?.assignedTeam ||
-                    "",
-                ).trim(),
-              ),
-              String(data?.teamName || "").trim(),
-              ...(Array.isArray(data?.teamNames)
-                ? data.teamNames.map((name: any) => String(name).trim())
-                : []),
-            ].filter(Boolean),
-          ),
+    const unsubscribeAlerts = onSnapshot(alertsQuery, (alertSnap) => {
+      const nextAlerts = alertSnap.docs
+        .map((d) => normalizeIncident(d.id, d.data()))
+        .filter((item) => {
+          const status = normalizeStatus(item.status);
+          return (
+            status === "pending" ||
+            status === "dispatched" ||
+            status === "validated"
+          );
+        })
+        .sort(
+          (a, b) =>
+            timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp),
         );
 
-        if (!dispatchedMap[alertId]) {
-          dispatchedMap[alertId] = [];
-        }
+      setAlerts(nextAlerts);
+    });
 
-        dispatchedMap[alertId] = Array.from(
-          new Set([...dispatchedMap[alertId], ...teamNames]),
-        );
-      });
+    const dispatchesQuery = collection(db, "dispatches");
 
-      setAlertDispatchedTeams(dispatchedMap);
+    const unsubscribeDispatches = onSnapshot(
+      dispatchesQuery,
+      (dispatchSnap) => {
+        const dispatchedMap: Record<string, string[]> = {};
+
+        dispatchSnap.docs.forEach((docSnap) => {
+          const data = docSnap.data() as any;
+          const status = normalizeStatus(data?.status);
+
+          if (!["dispatched", "validated", "confirmed"].includes(status))
+            return;
+
+          const alertId = String(data?.alertId || "").trim();
+          if (!alertId) return;
+
+          const teamNames = Array.from(
+            new Set(
+              [
+                ...(data?.responders || []).map((r: any) =>
+                  String(
+                    r?.teamName ||
+                      r?.team ||
+                      r?.assignedTeamName ||
+                      r?.assignedTeam ||
+                      "",
+                  ).trim(),
+                ),
+                String(data?.teamName || "").trim(),
+                ...(Array.isArray(data?.teamNames)
+                  ? data.teamNames.map((name: any) => String(name).trim())
+                  : []),
+              ].filter(Boolean),
+            ),
+          );
+
+          if (!dispatchedMap[alertId]) {
+            dispatchedMap[alertId] = [];
+          }
+
+          dispatchedMap[alertId] = Array.from(
+            new Set([...dispatchedMap[alertId], ...teamNames]),
+          );
+        });
+
+        setAlertDispatchedTeams(dispatchedMap);
+      },
+    );
+
+    return () => {
+      unsubscribeAlerts();
+      unsubscribeDispatches();
     };
-
-    await loadAlertDispatchedTeams();
   };
 
   useEffect(() => {
@@ -1237,6 +1408,10 @@ const AlertDispatchModal = () => {
     : "";
   const hasValidationImage = Boolean(validationImageSrc);
 
+  const isValidatedPreview =
+    normalizeStatus(previewAlert?.status) === "validated" &&
+    !!getValidationReport(previewAlert);
+
   return (
     <>
       {showModal && (
@@ -1334,6 +1509,7 @@ const AlertDispatchModal = () => {
                           <th>Reporter</th>
                           <th>Contact</th>
                           <th>Address</th>
+                          <th>Status</th>
                           <th>Time</th>
                           <th>Action</th>
                         </tr>
@@ -1346,10 +1522,48 @@ const AlertDispatchModal = () => {
                             className={styles.clickableRow}
                             onClick={() => openAlertPreview(a)}
                           >
-                            <td data-label="Type">{a.type}</td>
+                            <td data-label="Type">
+                              <div className={styles.typeWrapper}>
+                                <span className={styles.typeText}>
+                                  {getBaseType(a)}
+                                </span>
+
+                                {getTypeBadge(a) && (
+                                  <span className={styles.typeBadge}>
+                                    {getTypeBadge(a)}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                             <td data-label="Reporter">{a.userName}</td>
                             <td data-label="Contact">{a.userContact}</td>
-                            <td data-label="Address">{a.userAddress}</td>
+                            <td
+                              data-label="Address"
+                              className={styles.addressCell}
+                              title={a.userAddress}
+                            >
+                              {a.userAddress && a.userAddress.length > 40
+                                ? a.userAddress.substring(0, 40) + "..."
+                                : a.userAddress}
+                            </td>
+
+                            <td data-label="Status">
+                              <span
+                                className={
+                                  normalizeStatus(a.status) === "pending"
+                                    ? styles.statusPending
+                                    : normalizeStatus(a.status) === "dispatched"
+                                      ? styles.statusDispatched
+                                      : normalizeStatus(a.status) ===
+                                          "validated"
+                                        ? styles.statusValidated
+                                        : styles.statusUnavailable
+                                }
+                              >
+                                {formatStatusWithTeam(a)}
+                              </span>
+                            </td>
+
                             <td data-label="Time">
                               {a.timestamp?.seconds
                                 ? new Date(
@@ -1357,6 +1571,7 @@ const AlertDispatchModal = () => {
                                   ).toLocaleString()
                                 : "Unknown"}
                             </td>
+
                             <td
                               data-label="Action"
                               style={{
@@ -1468,7 +1683,9 @@ const AlertDispatchModal = () => {
                             <td data-label="Distance">
                               {teamDistancesKm[g.team] !== null &&
                               teamDistancesKm[g.team] !== undefined
-                                ? `${(teamDistancesKm[g.team] as number).toFixed(2)} km`
+                                ? `${(
+                                    teamDistancesKm[g.team] as number
+                                  ).toFixed(2)} km`
                                 : "N/A"}
                             </td>
                             <td data-label="Status">
@@ -1605,109 +1822,167 @@ const AlertDispatchModal = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Validation Review</h3>
+              <div className={styles.modalHeaderTopRow}>
+                <h3 className={styles.modalTitle}>
+                  {isValidatedPreview ? "Validation Review" : "Alert Details"}
+                </h3>
 
-              <div className={styles.previewToggleWrap}>
-                <button
-                  type="button"
-                  className={`${styles.previewToggleBtn} ${
-                    previewDetailTab === "validation"
-                      ? styles.previewToggleBtnActive
-                      : ""
-                  }`}
-                  onClick={() => setPreviewDetailTab("validation")}
-                >
-                  Validation Report
-                </button>
-
-                <button
-                  type="button"
-                  className={`${styles.previewToggleBtn} ${
-                    previewDetailTab === "alert"
-                      ? styles.previewToggleBtnActive
-                      : ""
-                  }`}
-                  onClick={() => setPreviewDetailTab("alert")}
-                >
-                  Alert Details
-                </button>
+                {getDispatchedTeamBadge(previewAlert) && (
+                  <span className={styles.dispatchedHeaderBadge}>
+                    {getDispatchedTeamBadge(previewAlert)}
+                  </span>
+                )}
               </div>
+
+              {isValidatedPreview && (
+                <div className={styles.previewToggleWrap}>
+                  <button
+                    type="button"
+                    className={`${styles.previewToggleBtn} ${
+                      previewDetailTab === "validation"
+                        ? styles.previewToggleBtnActive
+                        : ""
+                    }`}
+                    onClick={() => setPreviewDetailTab("validation")}
+                  >
+                    Validation Report
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`${styles.previewToggleBtn} ${
+                      previewDetailTab === "alert"
+                        ? styles.previewToggleBtnActive
+                        : ""
+                    }`}
+                    onClick={() => setPreviewDetailTab("alert")}
+                  >
+                    Alert Details
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className={styles.modalBody}>
-              {previewDetailTab === "validation" ? (
-                <>
-                  <div className={styles.validationGrid}>
-                    <div className={styles.validationImageWrap}>
-                      {hasValidationImage ? (
-                        <img
-                          src={validationImageSrc}
-                          alt="Validation"
-                          className={styles.validationImage}
-                        />
-                      ) : (
-                        <div className={styles.validationNoImage}>
-                          No validation image available.
-                        </div>
-                      )}
-                    </div>
+              {isValidatedPreview && previewDetailTab === "validation" ? (
+                <div className={styles.validationGrid}>
+                  <div className={styles.validationImageWrap}>
+                    {hasValidationImage ? (
+                      <img
+                        src={validationImageSrc}
+                        alt="Validation"
+                        className={styles.validationImage}
+                      />
+                    ) : (
+                      <div className={styles.validationNoImage}>
+                        No validation image available.
+                      </div>
+                    )}
+                  </div>
 
-                    <div className={styles.validationDetails}>
-                      {getValidationReport(previewAlert) ? (
-                        getValidationReport(previewAlert)
-                          ?.skippedBecauseRadioed ? (
-                          <p>
-                            <strong>Validated By:</strong>{" "}
-                            {getValidationReport(previewAlert)?.validatedBy ||
-                              "N/A"}
-                          </p>
-                        ) : (
-                          <>
+                  <div className={styles.validationDetails}>
+                    {getValidationReport(previewAlert) ? (
+                      getValidationReport(previewAlert)
+                        ?.skippedBecauseRadioed ? (
+                        <>
+                          {hasDisplayValue(
+                            getValidationReport(previewAlert)?.validatedBy,
+                          ) && (
                             <p>
                               <strong>Validated By:</strong>{" "}
-                              {getValidationReport(previewAlert)?.validatedBy ||
-                                "N/A"}
+                              {getValidationReport(previewAlert)?.validatedBy}
                             </p>
+                          )}
+
+                          {hasDisplayValue(
+                            getValidationTimeValue(previewAlert),
+                          ) && (
+                            <p>
+                              <strong>Validation Time:</strong>{" "}
+                              {formatValidationTime(
+                                getValidationTimeValue(previewAlert),
+                              )}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {hasDisplayValue(
+                            getValidationReport(previewAlert)?.validatedBy,
+                          ) && (
+                            <p>
+                              <strong>Validated By:</strong>{" "}
+                              {getValidationReport(previewAlert)?.validatedBy}
+                            </p>
+                          )}
+
+                          {hasDisplayValue(
+                            getValidationTimeValue(previewAlert),
+                          ) && (
+                            <p>
+                              <strong>Validation Time:</strong>{" "}
+                              {formatValidationTime(
+                                getValidationTimeValue(previewAlert),
+                              )}
+                            </p>
+                          )}
+
+                          {hasDisplayValue(
+                            getValidationReport(previewAlert)?.fireTypes,
+                          ) && (
                             <p>
                               <strong>Fire Type:</strong>{" "}
                               {formatListValue(
                                 getValidationReport(previewAlert)?.fireTypes,
+                                "",
                               )}
                             </p>
+                          )}
+
+                          {hasDisplayValue(
+                            getValidationReport(previewAlert)?.sourceOfFire,
+                          ) && (
                             <p>
                               <strong>Source of Fire:</strong>{" "}
-                              {formatListValue(
-                                getValidationReport(previewAlert)?.sourceOfFire,
-                              )}
+                              {getValidationReport(previewAlert)?.sourceOfFire}
                             </p>
+                          )}
+
+                          {getValidationReport(previewAlert)
+                            ?.injuredOrTrapped === true && (
                             <p>
-                              <strong>Injured / Trapped:</strong>{" "}
-                              {formatBool(
-                                getValidationReport(previewAlert)
-                                  ?.injuredOrTrapped,
-                              )}
+                              <strong>Injured / Trapped:</strong> Yes
                             </p>
+                          )}
+
+                          {hasDisplayValue(
+                            getValidationReport(previewAlert)?.resourcesNeeded,
+                          ) && (
                             <p>
                               <strong>Resources Needed:</strong>{" "}
                               {formatListValue(
                                 getValidationReport(previewAlert)
                                   ?.resourcesNeeded,
+                                "",
                               )}
                             </p>
+                          )}
+
+                          {hasDisplayValue(
+                            getValidationReport(previewAlert)?.remarks,
+                          ) && (
                             <p>
                               <strong>Remarks:</strong>{" "}
-                              {formatListValue(
-                                getValidationReport(previewAlert)?.remarks,
-                              )}
+                              {getValidationReport(previewAlert)?.remarks}
                             </p>
-                          </>
-                        )
-                      ) : (
-                        <p>No validation report available.</p>
-                      )}
-                    </div>
+                          )}
+                        </>
+                      )
+                    ) : (
+                      <p>No validation report available.</p>
+                    )}
                   </div>
-                </>
+                </div>
               ) : (
                 <>
                   <div className={styles.snapshotTopGrid}>
@@ -1773,6 +2048,25 @@ const AlertDispatchModal = () => {
                     <p>
                       <strong>Time:</strong> {formattedAlertTime}
                     </p>
+                    {dispatchInfo && (
+                      <>
+                        <p>
+                          <strong>Dispatched Time:</strong>{" "}
+                          {formatDispatchTime(dispatchInfo.timestamp)}
+                        </p>
+
+                        <p>
+                          <strong>Dispatched Team:</strong>{" "}
+                          {Array.from(
+                            new Set(
+                              (dispatchInfo.responders || []).map(
+                                (r: any) => r.team || r.teamName,
+                              ),
+                            ),
+                          ).join(", ") || "N/A"}
+                        </p>
+                      </>
+                    )}
                     <p>
                       <strong>Trigger Source:</strong> {triggerSource}
                     </p>

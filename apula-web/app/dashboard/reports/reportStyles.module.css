@@ -748,7 +748,7 @@
   .reportTable td,
   .reportTable tr {
     display: block;
-    width: 100%;
+    width: 95%;
   }
 
   .reportTable thead {

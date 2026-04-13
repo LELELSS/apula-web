@@ -26,11 +26,9 @@ export default function TeamVehiclePage() {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [responders, setResponders] = useState<any[]>([]);
 
-  // Add modals
   const [showAddTeamModal, setShowAddTeamModal] = useState(false);
   const [showAddVehicleModal, setShowAddVehicleModal] = useState(false);
 
-  // Add inputs
   const [newTeamName, setNewTeamName] = useState("");
   const [selectedLeader, setSelectedLeader] = useState("");
 
@@ -38,11 +36,9 @@ export default function TeamVehiclePage() {
   const [vehiclePlate, setVehiclePlate] = useState("");
   const [vehicleTeam, setVehicleTeam] = useState("");
 
-  // Edit modals
   const [editingTeam, setEditingTeam] = useState<any | null>(null);
   const [editingVehicle, setEditingVehicle] = useState<any | null>(null);
 
-  // DELETE CONFIRM MODAL STATE
   const [confirmDelete, setConfirmDelete] = useState<{
     type: "team" | "vehicle";
     id: string;
@@ -51,9 +47,6 @@ export default function TeamVehiclePage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // ------------------------------------------
-  // Helpers
-  // ------------------------------------------
   const normalizeStatus = (raw: any) => {
     if (!raw) return "";
     const low = String(raw).toLowerCase();
@@ -64,9 +57,6 @@ export default function TeamVehiclePage() {
     return raw;
   };
 
-  // ------------------------------------------
-  // Load Teams
-  // ------------------------------------------
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "teams"), (snap) => {
       setTeams(
@@ -83,9 +73,6 @@ export default function TeamVehiclePage() {
     return () => unsub();
   }, []);
 
-  // ------------------------------------------
-  // Load Vehicles
-  // ------------------------------------------
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "vehicles"), (snap) => {
       setVehicles(
@@ -102,9 +89,6 @@ export default function TeamVehiclePage() {
     return () => unsub();
   }, []);
 
-  // ------------------------------------------
-  // Load Responders
-  // ------------------------------------------
   useEffect(() => {
     const q = query(collection(db, "users"), where("role", "==", "responder"));
     const unsub = onSnapshot(q, (snap) => {
@@ -113,9 +97,6 @@ export default function TeamVehiclePage() {
     return () => unsub();
   }, []);
 
-  // ------------------------------------------
-  // Create team
-  // ------------------------------------------
   const createTeam = async () => {
     if (!newTeamName.trim()) {
       setErrorMessage("Please enter team name.");
@@ -134,7 +115,6 @@ export default function TeamVehiclePage() {
         return;
       }
 
-      // ✅ prevent assigning a responder who is already a leader
       const existingLeaderTeam = teams.find((t) => t.leaderId === leader.id);
 
       if (existingLeaderTeam) {
@@ -184,9 +164,6 @@ export default function TeamVehiclePage() {
     }
   };
 
-  // ------------------------------------------
-  // Create vehicle
-  // ------------------------------------------
   const createVehicle = async () => {
     if (!vehicleCode.trim()) {
       setErrorMessage("Please enter vehicle code.");
@@ -245,9 +222,6 @@ export default function TeamVehiclePage() {
     }
   };
 
-  // ------------------------------------------
-  // Open Edit Team modal
-  // ------------------------------------------
   const openEditTeam = (team: any) => {
     setEditingTeam({
       ...team,
@@ -255,9 +229,6 @@ export default function TeamVehiclePage() {
     });
   };
 
-  // ------------------------------------------
-  // Save edited team
-  // ------------------------------------------
   const saveEditTeam = async () => {
     if (!editingTeam) return;
 
@@ -281,7 +252,6 @@ export default function TeamVehiclePage() {
         return;
       }
 
-      // ✅ prevent assigning a responder who is already a leader of another team
       const existingLeaderTeam = teams.find(
         (t) => t.leaderId === newLeaderId && t.id !== editingTeam.id,
       );
@@ -363,9 +333,6 @@ export default function TeamVehiclePage() {
     }
   };
 
-  // ------------------------------------------
-  // Delete team
-  // ------------------------------------------
   const deleteTeam = async (teamId: string) => {
     try {
       const usersQuery = query(
@@ -410,9 +377,6 @@ export default function TeamVehiclePage() {
     }
   };
 
-  // ------------------------------------------
-  // Open Edit Vehicle modal
-  // ------------------------------------------
   const openEditVehicle = (v: any) => {
     setEditingVehicle({
       id: v.id,
@@ -424,9 +388,6 @@ export default function TeamVehiclePage() {
     setShowAddVehicleModal(false);
   };
 
-  // ------------------------------------------
-  // Save edited vehicle
-  // ------------------------------------------
   const saveEditVehicle = async () => {
     if (!editingVehicle) return;
 
@@ -491,9 +452,6 @@ export default function TeamVehiclePage() {
     }
   };
 
-  // ------------------------------------------
-  // Delete vehicle
-  // ------------------------------------------
   const deleteVehicle = async (vehicleId: string) => {
     try {
       const q = query(
@@ -620,10 +578,12 @@ export default function TeamVehiclePage() {
 
                     return (
                       <tr key={team.id}>
-                        <td>{team.teamName}</td>
-                        <td>{memberCount}</td>
-                        <td>{team.leaderName || team.leader || "—"}</td>
-                        <td>
+                        <td data-label="Team Name">{team.teamName}</td>
+                        <td data-label="Members">{memberCount}</td>
+                        <td data-label="Leader">
+                          {team.leaderName || team.leader || "—"}
+                        </td>
+                        <td data-label="Status">
                           <span
                             className={
                               team.status === "Dispatched"
@@ -637,18 +597,10 @@ export default function TeamVehiclePage() {
                           </span>
                         </td>
 
-                        <td>
+                        <td data-label="Action">
                           <button
                             onClick={() => openEditTeam(team)}
-                            style={{
-                              marginRight: 8,
-                              padding: "6px 10px",
-                              borderRadius: 6,
-                              border: "none",
-                              background: "#f0ad4e",
-                              color: "#fff",
-                              cursor: "pointer",
-                            }}
+                            className={styles.editBtn}
                           >
                             Edit
                           </button>
@@ -657,14 +609,7 @@ export default function TeamVehiclePage() {
                             onClick={() =>
                               setConfirmDelete({ type: "team", id: team.id })
                             }
-                            style={{
-                              padding: "6px 10px",
-                              borderRadius: 6,
-                              border: "none",
-                              background: "#dc3545",
-                              color: "#fff",
-                              cursor: "pointer",
-                            }}
+                            className={styles.deleteBtn}
                           >
                             Delete
                           </button>
@@ -718,16 +663,16 @@ export default function TeamVehiclePage() {
                 <tbody>
                   {vehicles.map((v) => (
                     <tr key={v.id}>
-                      <td>{v.code}</td>
-                      <td>{v.plate}</td>
-                      <td>
+                      <td data-label="Vehicle Code">{v.code}</td>
+                      <td data-label="Plate Number">{v.plate}</td>
+                      <td data-label="Team Assigned">
                         {v.assignedTeam ||
                           teams.find((t) => t.id === v.assignedTeamId)
                             ?.teamName ||
                           "—"}
                       </td>
 
-                      <td>
+                      <td data-label="Status">
                         <span
                           className={
                             v.status === "Dispatched"
@@ -741,18 +686,10 @@ export default function TeamVehiclePage() {
                         </span>
                       </td>
 
-                      <td>
+                      <td data-label="Action">
                         <button
                           onClick={() => openEditVehicle(v)}
-                          style={{
-                            marginRight: 8,
-                            padding: "6px 10px",
-                            borderRadius: 6,
-                            border: "none",
-                            background: "#f0ad4e",
-                            color: "#fff",
-                            cursor: "pointer",
-                          }}
+                          className={styles.editBtn}
                         >
                           Edit
                         </button>
@@ -761,14 +698,7 @@ export default function TeamVehiclePage() {
                           onClick={() =>
                             setConfirmDelete({ type: "vehicle", id: v.id })
                           }
-                          style={{
-                            padding: "6px 10px",
-                            borderRadius: 6,
-                            border: "none",
-                            background: "#dc3545",
-                            color: "#fff",
-                            cursor: "pointer",
-                          }}
+                          className={styles.deleteBtn}
                         >
                           Delete
                         </button>
@@ -782,7 +712,6 @@ export default function TeamVehiclePage() {
         </div>
       </div>
 
-      {/* ADD TEAM MODAL */}
       {showAddTeamModal && !editingTeam && (
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>
@@ -828,7 +757,6 @@ export default function TeamVehiclePage() {
         </div>
       )}
 
-      {/* EDIT TEAM MODAL */}
       {editingTeam && (
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>
@@ -904,7 +832,6 @@ export default function TeamVehiclePage() {
         </div>
       )}
 
-      {/* ADD VEHICLE MODAL */}
       {showAddVehicleModal && !editingVehicle && (
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>
@@ -957,7 +884,6 @@ export default function TeamVehiclePage() {
         </div>
       )}
 
-      {/* EDIT VEHICLE MODAL */}
       {editingVehicle && (
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>
@@ -1039,7 +965,6 @@ export default function TeamVehiclePage() {
         </div>
       )}
 
-      {/* CONFIRM DELETE MODAL */}
       {confirmDelete && (
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>
@@ -1073,7 +998,6 @@ export default function TeamVehiclePage() {
         </div>
       )}
 
-      {/* SUCCESS MODAL */}
       {successMessage && (
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>
@@ -1099,7 +1023,6 @@ export default function TeamVehiclePage() {
         </div>
       )}
 
-      {/* ERROR MODAL */}
       {errorMessage && (
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>

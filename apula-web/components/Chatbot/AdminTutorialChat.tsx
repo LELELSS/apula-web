@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, useEffect } from "react";
 import { FaRobot, FaTimes, FaPaperPlane } from "react-icons/fa";
-import styles from "./AdminTutorialChat.module.css";
+import styles from "./adminTutorialChat.module.css";
 
 type Message = {
   id: string;

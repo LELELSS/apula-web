@@ -365,7 +365,7 @@
 @media (max-width: 768px) {
   .chatFab {
     right: 16px;
-    bottom: 96px;
+    bottom: 10px;
     width: 58px;
     height: 58px;
     font-size: 24px;

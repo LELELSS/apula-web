@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import AdminHeader from "@/components/shared/adminHeader";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
@@ -9,27 +9,28 @@ import styles from "./settingsStyles.module.css";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { auth, db } from "@/lib/firebase";
-import { updatePassword, updateProfile } from "firebase/auth";
-import { doc, updateDoc } from "firebase/firestore";
+import { updatePassword, updateProfile, onAuthStateChanged } from "firebase/auth";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
 
 const SettingsPage = () => {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [loadingUser, setLoadingUser] = useState(true);
 
-  // ❌ AUTH PROTECTION + USER DATA LOADING (COMMENTED OUT)
-  /*
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        router.push("/login");
+        setLoadingUser(false);
         return;
       }
 
       try {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+          const data = userSnap.data();
           setName(data.name || user.displayName || "");
         } else {
           setName(user.displayName || "");
@@ -38,15 +39,13 @@ const SettingsPage = () => {
         console.error("Error loading user data:", error);
         toast.error("Failed to load user data");
       } finally {
-        setLoading(false);
+        setLoadingUser(false);
       }
     });
 
     return () => unsubscribe();
-  }, [router]);
-  */
+  }, []);
 
-  // ✅ Save changes handler
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -101,14 +100,14 @@ const SettingsPage = () => {
           <hr className={styles.separator} />
 
           <form onSubmit={handleSave} className={styles.form}>
-
             <label className={styles.label}>Full Name</label>
             <input
               type="text"
               className={styles.input}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your full name"
+              placeholder={loadingUser ? "Loading name..." : "Enter your full name"}
+              disabled={loadingUser}
             />
 
             <label className={styles.label}>New Password</label>
@@ -129,8 +128,12 @@ const SettingsPage = () => {
               placeholder="Confirm new password"
             />
 
-            <button type="submit" className={styles.saveBtn}>
-              <span>Save Changes</span>
+            <button
+              type="submit"
+              className={styles.saveBtn}
+              disabled={loadingUser}
+            >
+              <span>{loadingUser ? "Loading..." : "Save Changes"}</span>
             </button>
           </form>
 

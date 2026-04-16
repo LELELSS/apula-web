@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { FaBell } from "react-icons/fa";
 import styles from "./alertBellButton.module.css";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 
 const normalizeStatus = (value: unknown) =>
   String(value || "").trim().toLowerCase();
@@ -50,6 +50,77 @@ const isOpenBackupRequest = (data: Record<string, unknown>) => {
   return true;
 };
 
+const isOpenAlert = (data: Record<string, unknown>) => {
+  const status = normalizeStatus(data.status);
+  const confirmationStatus = normalizeStatus(data.confirmationStatus);
+  const dispatchStatus = normalizeStatus(data.dispatchStatus);
+  const monitoringStatus = normalizeStatus(data.monitoringStatus);
+
+  if (
+    status === "confirmed" ||
+    status === "resolved" ||
+    status === "closed" ||
+    status === "completed" ||
+    status === "done" ||
+    status === "cancelled" ||
+    status === "canceled"
+  ) {
+    return false;
+  }
+
+  if (
+    confirmationStatus === "confirmed" ||
+    confirmationStatus === "resolved" ||
+    confirmationStatus === "closed" ||
+    confirmationStatus === "completed" ||
+    confirmationStatus === "done" ||
+    confirmationStatus === "cancelled" ||
+    confirmationStatus === "canceled"
+  ) {
+    return false;
+  }
+
+  if (
+    status === "pending" ||
+    status === "dispatched" ||
+    status === "validated"
+  ) {
+    return true;
+  }
+
+  if (
+    dispatchStatus === "pending" ||
+    dispatchStatus === "dispatched" ||
+    dispatchStatus === "validated"
+  ) {
+    return true;
+  }
+
+  if (
+    confirmationStatus === "pending" ||
+    confirmationStatus === "for confirmation" ||
+    confirmationStatus === "validated" ||
+    confirmationStatus === "waiting"
+  ) {
+    return true;
+  }
+
+  if (
+    monitoringStatus === "pending" ||
+    monitoringStatus === "validated" ||
+    monitoringStatus === "for confirmation" ||
+    monitoringStatus === "waiting"
+  ) {
+    return true;
+  }
+
+  if (typeof data.confirmed === "boolean") return !data.confirmed;
+  if (typeof data.isConfirmed === "boolean") return !data.isConfirmed;
+  if (typeof data.resolved === "boolean") return !data.resolved;
+
+  return false;
+};
+
 type AlertBellButtonProps = {
   enableSound?: boolean;
 };
@@ -76,10 +147,13 @@ const AlertBellButton = ({ enableSound = true }: AlertBellButtonProps) => {
   }, [enableSound]);
 
   useEffect(() => {
-    const q = query(collection(db, "alerts"), where("status", "==", "Pending"));
+    const unsub = onSnapshot(collection(db, "alerts"), (snap) => {
+      const openCount = snap.docs.reduce((count, docSnap) => {
+        const data = docSnap.data() as Record<string, unknown>;
+        return isOpenAlert(data) ? count + 1 : count;
+      }, 0);
 
-    const unsub = onSnapshot(q, (snap) => {
-      setAlertCount(snap.size);
+      setAlertCount(openCount);
     });
 
     return () => unsub();

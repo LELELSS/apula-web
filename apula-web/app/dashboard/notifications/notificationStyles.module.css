@@ -564,10 +564,13 @@
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
-  overflow-y: auto;
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
   animation: fadeIn 0.3s ease;
   color: black;
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* changed */
 }
 
 .modalHeader {
@@ -575,6 +578,7 @@
   align-items: stretch;
   width: 100%;
   min-height: 76px;
+  flex-shrink: 0; /* added */
 }
 
 .modalHeaderIconBox {
@@ -624,12 +628,17 @@
   height: 1px;
   background: #e5e7eb;
   margin: 14px 0 12px 0;
+  flex-shrink: 0; /* added */
 }
 
 .modalDetails {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow-y: auto; /* added */
+  flex: 1; /* added */
+  min-height: 0; /* added */
+  padding-right: 4px; /* optional */
 }
 
 .modalSectionTitle {
@@ -701,6 +710,7 @@
   position: relative;
   overflow: hidden;
   transition: color 0.3s ease;
+  flex-shrink: 0; /* added */
 }
 
 .closeBtn::before {

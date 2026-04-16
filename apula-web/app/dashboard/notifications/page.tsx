@@ -778,6 +778,67 @@ const NotificationPage: React.FC = () => {
               const rawType = String(selectedNotif?.type || "").toLowerCase();
               const isFire = isFireRelatedNotification(selectedNotif);
 
+              const status = normalizeStatus(selectedNotif.status || "Pending");
+
+              const fireType =
+                selectedNotif.type ||
+                selectedNotif.alertType ||
+                (selectedNotif.__source === "backup_requests"
+                  ? "Backup Request"
+                  : "Fire Alert");
+
+              const teamDispatched =
+                selectedNotif.teamName ||
+                selectedNotif.assignedTeam ||
+                selectedNotif.dispatchedTeam ||
+                "N/A";
+
+              const incidentDateValue =
+                selectedNotif.incidentDate ||
+                selectedNotif.fireIncidentDate ||
+                selectedNotif.fireDate ||
+                selectedNotif.timestamp ||
+                null;
+
+              const displayDateValue =
+                status === "confirmed"
+                  ? selectedNotif.confirmedAt ||
+                    selectedNotif.confirmationDate ||
+                    selectedNotif.timestamp
+                  : status === "validated"
+                  ? selectedNotif.validatedAt ||
+                    selectedNotif.validationDate ||
+                    selectedNotif.timestamp
+                  : status === "dispatched"
+                  ? selectedNotif.dispatchedAt ||
+                    selectedNotif.dispatchDate ||
+                    selectedNotif.timestamp
+                  : selectedNotif.timestamp;
+
+              const displayDateLabel =
+                status === "confirmed"
+                  ? "Confirmed Date"
+                  : status === "validated"
+                  ? "Validated Date"
+                  : status === "dispatched"
+                  ? "Dispatched Date"
+                  : "Received Date";
+
+              const formatDateTime = (value: any) => {
+                if (!value) return "N/A";
+
+                if (value?.seconds) {
+                  return new Date(value.seconds * 1000).toLocaleString();
+                }
+
+                if (typeof value?.toDate === "function") {
+                  return value.toDate().toLocaleString();
+                }
+
+                const parsed = new Date(value);
+                return isNaN(parsed.getTime()) ? "N/A" : parsed.toLocaleString();
+              };
+
               return (
                 <>
                   <div className={styles.modalHeader}>
@@ -820,26 +881,40 @@ const NotificationPage: React.FC = () => {
                         </span>
                       </div>
 
-                      {selectedNotif.timestamp && (
-                        <div className={styles.modalInfoRow}>
-                          <span className={styles.modalLabel}>Date</span>
-                          <span className={styles.modalValue}>
-                            {selectedNotif.timestamp?.seconds
-                              ? new Date(
-                                  selectedNotif.timestamp.seconds * 1000
-                                ).toLocaleString()
-                              : "Pending..."}
-                          </span>
-                        </div>
-                      )}
-
                       {isFire && (
-                        <div className={styles.modalInfoRow}>
-                          <span className={styles.modalLabel}>Location</span>
-                          <span className={styles.modalValue}>
-                            {selectedNotif.location || "N/A"}
-                          </span>
-                        </div>
+                        <>
+                          <div className={styles.modalInfoRow}>
+                            <span className={styles.modalLabel}>Fire Type</span>
+                            <span className={styles.modalValue}>{fireType}</span>
+                          </div>
+
+                          <div className={styles.modalInfoRow}>
+                            <span className={styles.modalLabel}>
+                              {displayDateLabel}
+                            </span>
+                            <span className={styles.modalValue}>
+                              {formatDateTime(displayDateValue)}
+                            </span>
+                          </div>
+
+                          <div className={styles.modalInfoRow}>
+                            <span className={styles.modalLabel}>Incident Date</span>
+                            <span className={styles.modalValue}>
+                              {formatDateTime(incidentDateValue)}
+                            </span>
+                          </div>
+
+                          <div className={styles.modalInfoRow}>
+                            <span className={styles.modalLabel}>Address</span>
+                            <span className={styles.modalValue}>
+                              {selectedNotif.userAddress ||
+                                selectedNotif.address ||
+                                selectedNotif.location ||
+                                "N/A"}
+                            </span>
+                          </div>
+
+                        </>
                       )}
 
                       {rawType.includes("validation") && (
@@ -858,15 +933,6 @@ const NotificationPage: React.FC = () => {
                             </span>
                           </div>
                         </>
-                      )}
-
-                      {rawType.includes("confirmed") && (
-                        <div className={styles.modalInfoRow}>
-                          <span className={styles.modalLabel}>Admin</span>
-                          <span className={styles.modalValue}>
-                            {selectedNotif.adminName || "Admin"}
-                          </span>
-                        </div>
                       )}
 
                       {rawType.includes("account") && (

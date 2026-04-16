@@ -58,7 +58,9 @@ export default function AdminHeader() {
     if (!trimmed) return "U";
 
     const firstToken = trimmed.split(/\s+/)[0];
-    const base = firstToken.includes("@") ? firstToken.split("@")[0] : firstToken;
+    const base = firstToken.includes("@")
+      ? firstToken.split("@")[0]
+      : firstToken;
     const match = base.match(/[A-Za-z0-9]/);
 
     return match ? match[0].toUpperCase() : "U";
@@ -109,23 +111,33 @@ export default function AdminHeader() {
       setUnreadCount(alertUnread + backupUnread);
     };
 
-    const unsubscribeAlerts = onSnapshot(collection(db, "alerts"), (snapshot) => {
-      alertUnread = snapshot.docs.reduce((count, docSnap) => {
-        const data = docSnap.data() as Record<string, unknown>;
-        const readers = Array.isArray(data.readBy) ? (data.readBy as string[]) : [];
-        return readers.includes(currentUid) ? count : count + 1;
-      }, 0);
-      syncUnread();
-    });
+    const unsubscribeAlerts = onSnapshot(
+      collection(db, "alerts"),
+      (snapshot) => {
+        alertUnread = snapshot.docs.reduce((count, docSnap) => {
+          const data = docSnap.data() as Record<string, unknown>;
+          const readers = Array.isArray(data.readBy)
+            ? (data.readBy as string[])
+            : [];
+          return readers.includes(currentUid) ? count : count + 1;
+        }, 0);
+        syncUnread();
+      },
+    );
 
-    const unsubscribeBackup = onSnapshot(collection(db, "backup_requests"), (snapshot) => {
-      backupUnread = snapshot.docs.reduce((count, docSnap) => {
-        const data = docSnap.data() as Record<string, unknown>;
-        const readers = Array.isArray(data.readBy) ? (data.readBy as string[]) : [];
-        return readers.includes(currentUid) ? count : count + 1;
-      }, 0);
-      syncUnread();
-    });
+    const unsubscribeBackup = onSnapshot(
+      collection(db, "backup_requests"),
+      (snapshot) => {
+        backupUnread = snapshot.docs.reduce((count, docSnap) => {
+          const data = docSnap.data() as Record<string, unknown>;
+          const readers = Array.isArray(data.readBy)
+            ? (data.readBy as string[])
+            : [];
+          return readers.includes(currentUid) ? count : count + 1;
+        }, 0);
+        syncUnread();
+      },
+    );
 
     return () => {
       unsubscribeAlerts();
@@ -139,11 +151,11 @@ export default function AdminHeader() {
       query(
         collection(db, "users"),
         where("role", "==", "responder"),
-        where("approved", "==", false)
+        where("approved", "==", false),
       ),
       (snapshot) => {
         setPendingRequestCount(snapshot.size);
-      }
+      },
     );
 
     return () => unsubscribePendingRequests();
@@ -155,7 +167,7 @@ export default function AdminHeader() {
       query(
         collection(db, "users"),
         where("role", "==", "responder"),
-        where("approved", "==", true)
+        where("approved", "==", true),
       ),
       (snapshot) => {
         const count = snapshot.docs.filter((docSnap) => {
@@ -172,7 +184,7 @@ export default function AdminHeader() {
         }).length;
 
         setUnassignedCount(count);
-      }
+      },
     );
 
     return () => unsubscribeUnassigned();
@@ -221,6 +233,24 @@ export default function AdminHeader() {
   }, [pathname]);
 
   useEffect(() => {
+    const handleOpenSidebar = () => {
+      setSidebarOpen(true);
+    };
+
+    const handleCloseSidebar = () => {
+      setSidebarOpen(false);
+    };
+
+    window.addEventListener("apula-open-sidebar", handleOpenSidebar);
+    window.addEventListener("apula-close-sidebar", handleCloseSidebar);
+
+    return () => {
+      window.removeEventListener("apula-open-sidebar", handleOpenSidebar);
+      window.removeEventListener("apula-close-sidebar", handleCloseSidebar);
+    };
+  }, []);
+
+  useEffect(() => {
     if (role !== "admin" && role !== "superadmin") return;
     if (!pathname || lastLoggedPathRef.current === pathname) return;
 
@@ -244,7 +274,9 @@ export default function AdminHeader() {
 
   return (
     <>
-      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ""}`}>
+      <aside
+        className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ""}`}
+      >
         <div className={styles.sidebarHeader}>
           <Image src="/logo.png" alt="Sidebar Logo" width={150} height={75} />
           <button
@@ -259,6 +291,7 @@ export default function AdminHeader() {
 
         <nav className={styles.sidebarNav}>
           <a
+            id="nav-dashboard"
             href="/dashboard"
             className={`${styles.sidebarLink} ${isActive("/dashboard") ? styles.activeLink : ""}`}
             onClick={() => setSidebarOpen(false)}
@@ -268,6 +301,7 @@ export default function AdminHeader() {
           </a>
 
           <a
+            id="nav-notification"
             href="/dashboard/notifications"
             className={`${styles.sidebarLink} ${
               isActive("/dashboard/notifications") ? styles.activeLink : ""
@@ -285,6 +319,7 @@ export default function AdminHeader() {
 
           {(role === "superadmin" || role === "admin") && (
             <a
+              id="nav-users"
               href="/dashboard/users"
               className={`${styles.sidebarLink} ${isActive("/dashboard/users") ? styles.activeLink : ""}`}
               onClick={() => setSidebarOpen(false)}
@@ -296,6 +331,7 @@ export default function AdminHeader() {
 
           {role === "superadmin" && (
             <a
+              id="nav-admin-activity"
               href="/dashboard/admin-activity"
               className={`${styles.sidebarLink} ${isActive("/dashboard/admin-activity") ? styles.activeLink : ""}`}
               onClick={() => setSidebarOpen(false)}
@@ -306,6 +342,7 @@ export default function AdminHeader() {
           )}
 
           <a
+            id="nav-request"
             href="/dashboard/ResponderRequest"
             className={`${styles.sidebarLink} ${
               isActive("/dashboard/ResponderRequest") ? styles.activeLink : ""
@@ -322,6 +359,7 @@ export default function AdminHeader() {
           </a>
 
           <a
+            id="nav-team"
             href="/dashboard/Management"
             className={`${styles.sidebarLink} ${
               isActive("/dashboard/Management") ? styles.activeLink : ""
@@ -333,6 +371,7 @@ export default function AdminHeader() {
           </a>
 
           <a
+            id="nav-assign"
             href="/dashboard/Assign"
             className={`${styles.sidebarLink} ${
               isActive("/dashboard/Assign") ? styles.activeLink : ""
@@ -349,6 +388,7 @@ export default function AdminHeader() {
           </a>
 
           <a
+            id="nav-station"
             href="/dashboard/stations"
             className={`${styles.sidebarLink} ${
               isActive("/dashboard/stations") ? styles.activeLink : ""
@@ -360,6 +400,7 @@ export default function AdminHeader() {
           </a>
 
           <a
+            id="nav-dispatch"
             href="/dashboard/dispatch"
             className={`${styles.sidebarLink} ${
               isActive("/dashboard/dispatch") ? styles.activeLink : ""
@@ -371,6 +412,7 @@ export default function AdminHeader() {
           </a>
 
           <a
+            id="nav-reports"
             href="/dashboard/reports"
             className={`${styles.sidebarLink} ${
               isActive("/dashboard/reports") ? styles.activeLink : ""
@@ -382,6 +424,7 @@ export default function AdminHeader() {
           </a>
 
           <a
+            id="nav-settings"
             href="/dashboard/settings"
             className={`${styles.sidebarLink} ${
               isActive("/dashboard/settings") ? styles.activeLink : ""

@@ -136,6 +136,7 @@
 
 .tableWrap {
   overflow-x: auto;
+  border-radius: 10px;
 }
 
 .table {
@@ -144,10 +145,10 @@
 }
 
 .table th {
-  background: #8b0000;
+  background: #800000;
   color: #fff;
+  padding: 12px 14px;
   text-align: left;
-  padding: 10px;
 }
 
 .table td {
@@ -182,4 +183,65 @@
 
 .pageInfo {
   font-weight: 600;
+}
+
+/* ===== ACTIVITY INFO BOX ===== */
+
+.activityInfoBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+
+  padding: 12px 14px;
+  border-radius: 12px;
+
+  margin-top: 10px;
+  margin-bottom: 16px;
+}
+
+/* ICON */
+.activityInfoIcon {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+
+  border-radius: 8px;
+  background: #bae6fd;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #0369a1;
+  font-size: 14px;
+}
+
+/* TEXT */
+.activityInfoText {
+  font-size: 13px;
+  color: #0369a1;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ===== MOBILE ===== */
+
+@media (max-width: 600px) {
+  .activityInfoBox {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .activityInfoText {
+    font-size: 12px;
+  }
+
+  .activityInfoIcon {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+  }
 }

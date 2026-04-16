@@ -6,7 +6,8 @@ import styles from "./alertBellButton.module.css";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 
-const normalizeStatus = (value: unknown) => String(value || "").trim().toLowerCase();
+const normalizeStatus = (value: unknown) =>
+  String(value || "").trim().toLowerCase();
 
 const isOpenBackupRequest = (data: Record<string, unknown>) => {
   const status =
@@ -75,10 +76,7 @@ const AlertBellButton = ({ enableSound = true }: AlertBellButtonProps) => {
   }, [enableSound]);
 
   useEffect(() => {
-    const q = query(
-      collection(db, "alerts"),
-      where("status", "==", "Pending")
-    );
+    const q = query(collection(db, "alerts"), where("status", "==", "Pending"));
 
     const unsub = onSnapshot(q, (snap) => {
       setAlertCount(snap.size);
@@ -120,7 +118,7 @@ const AlertBellButton = ({ enableSound = true }: AlertBellButtonProps) => {
 
         handleCountUpdate("camel", openCount);
       },
-      () => handleCountUpdate("camel", 0)
+      () => handleCountUpdate("camel", 0),
     );
 
     return () => {
@@ -164,11 +162,16 @@ const AlertBellButton = ({ enableSound = true }: AlertBellButtonProps) => {
   };
 
   return (
-    <button className={styles.floatingBell} onClick={handleClick}>
+    <button
+      className={styles.floatingBell}
+      onClick={handleClick}
+      aria-label="Open fire alerts"
+    >
+      <span className={styles.tooltip}>Fire Alerts</span>
+
       <FaBell className={styles.icon} />
-      {totalCount > 0 && (
-        <span className={styles.badge}>{totalCount}</span>
-      )}
+
+      {totalCount > 0 && <span className={styles.badge}>{totalCount}</span>}
     </button>
   );
 };

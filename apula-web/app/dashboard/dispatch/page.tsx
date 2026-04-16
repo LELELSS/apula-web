@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import AdminHeader from "@/components/shared/adminHeader";
 import styles from "./dispatch.module.css";
-import { FaSearch, FaTruck } from "react-icons/fa";
+import { FaSearch, FaTruck, FaInfoCircle } from "react-icons/fa";
 
 import {
   collection,
@@ -23,32 +23,11 @@ import {
 import { auth, db } from "@/lib/firebase";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
+import AdminTutorialChat from "@/components/Chatbot/AdminTutorialChat";
 import { logActivity } from "@/lib/activityLog";
 
-const normalizeStatus = (value: unknown) => String(value || "").trim().toLowerCase();
-
-const isOpenBackupRequest = (data: Record<string, unknown>) => {
-  const status =
-    normalizeStatus(data.status) ||
-    normalizeStatus(data.requestStatus) ||
-    normalizeStatus(data.backupStatus) ||
-    normalizeStatus(data.dispatchStatus);
-
-  if (
-    status === "resolved" ||
-    status === "closed" ||
-    status === "completed" ||
-    status === "done" ||
-    status === "approved" ||
-    status === "declined" ||
-    status === "cancelled" ||
-    status === "canceled"
-  ) {
-    return false;
-  }
-
-  return true;
-};
+const normalizeStatus = (value: unknown) =>
+  String(value || "").trim().toLowerCase();
 
 const timestampToMillis = (value: any) => {
   if (!value) return 0;
@@ -57,140 +36,108 @@ const timestampToMillis = (value: any) => {
   return 0;
 };
 
-const normalizeIncident = (id: string, data: any, source: "alerts" | "backup_requests") => ({
+const normalizeIncident = (id: string, data: any) => ({
   id,
   ...data,
-  __source: source,
-  __isBackupRequest: source === "backup_requests",
-  __baseAlertId: source === "backup_requests" ? String(data?.alertId || "") : id,
-  type:
-    data?.type ||
-    data?.alertType ||
-    data?.requestType ||
-    (source === "backup_requests" ? "Backup Request" : "Fire Alert"),
+  __source: "alerts",
+  __baseAlertId: id,
+  type: data?.type || data?.alertType || "Fire Alert",
   location:
     data?.location ||
     data?.alertLocation ||
     data?.userAddress ||
     data?.address ||
-    data?.stationName ||
     "Unknown Location",
-  userName:
-    data?.userName ||
-    data?.requestedByName ||
-    data?.reportedBy ||
-    "Unknown",
-  userContact:
-    data?.userContact ||
-    data?.contact ||
-    data?.phone ||
-    data?.requestedByEmail ||
-    "",
+  userName: data?.userName || data?.reportedBy || "Unknown",
+  userContact: data?.userContact || data?.contact || data?.phone || "",
   userAddress:
     data?.userAddress ||
     data?.address ||
     data?.location ||
     data?.alertLocation ||
-    data?.stationName ||
     "",
-  timestamp:
-    data?.timestamp ||
-    data?.createdAt ||
-    data?.requestedAt ||
-    null,
+  timestamp: data?.timestamp || data?.createdAt || null,
+  status: data?.status || "Pending",
 });
 
-/**
- * DispatchPage
- *
- * Option A: annotated / commented version — includes:
- *  - dispatchResponders updates (responders, alert, dispatch record)
- *  - team + vehicle status updates on dispatch
- *  - auto-reset logic:
- *      A) if team leader becomes Available -> reset team + vehicle + team members
- *      B) if ALL responders in a team are Available -> reset team + vehicle + team members
- *
- * Notes about assumptions:
- *  - responders documents may contain either `teamId` or `teamName` (we handle both).
- *  - teams documents contain at least { id, teamName, leaderId }.
- *  - vehicles documents contain at least { id, code, assignedTeam, assignedTeamId }.
- *  - "status" string values used: "Available", "Dispatched", "Unavailable"
- */
+const getBaseType = (alert: any) => {
+  const typeRaw = (alert?.type || alert?.alertType || "").toLowerCase();
+
+  if (typeRaw.includes("panic")) return "Manual Alert";
+  return "Fire Alert";
+};
+
+const getTypeBadge = (alert: any) => {
+  const typeRaw = (alert?.type || alert?.alertType || "").toLowerCase();
+
+  if (typeRaw.includes("panic")) return "Manual alert";
+  if (typeRaw.includes("confirmed")) return "Confirmed by user";
+  if (typeRaw.includes("no user response") || typeRaw.includes("unverified")) {
+    return "No user response";
+  }
+
+  return null;
+};
 
 const DispatchPage: React.FC = () => {
-  // UI states
   const [searchTerm, setSearchTerm] = useState("");
   const [responders, setResponders] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
-  const [teams, setTeams] = useState<any[]>([]); // <-- added teams realtime
+  const [teams, setTeams] = useState<any[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // dispatch flow states
-  const [pendingDispatchIds, setPendingDispatchIds] = useState<Set<string> | null>(null);
+  const [pendingDispatchIds, setPendingDispatchIds] = useState<Set<string> | null>(
+    null,
+  );
   const [selectedAlert, setSelectedAlert] = useState<any>(null);
   const [showResponderModal, setShowResponderModal] = useState(false);
-  const [selectedResponderIds, setSelectedResponderIds] = useState<Set<string>>(new Set());
+  const [selectedResponderIds, setSelectedResponderIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const [selectedDispatch, setSelectedDispatch] = useState<any>(null);
-const [showDispatchInfoModal, setShowDispatchInfoModal] = useState(false);
+  const [showDispatchInfoModal, setShowDispatchInfoModal] = useState(false);
 
+  const getPageDescription = () => {
+    if (showResponderModal && selectedAlert) {
+      return "This page is used to dispatch available responder teams. Select a fire alert, review the selected team members, then proceed with dispatch.";
+    }
 
-const viewDispatchInfo = async (teamName: string) => {
-  type DispatchRecord = {
-    id: string;
-    status?: string;
-    responders?: Array<{ teamName?: string }>;
-    [key: string]: unknown;
+    return "This page displays all responder teams together with their assigned truck and current dispatch status. Use this page to dispatch available teams to active fire alerts.";
   };
 
-  const snap = await getDocs(
-  query(
-    collection(db, "dispatches"),
-    orderBy("timestamp", "desc")
-  )
-);
+  const getStatusClass = (status: string) => {
+    if (status === "Available") return styles.statusAvailable;
+    if (status === "Dispatched") return styles.statusDispatched;
+    return styles.statusUnavailable;
+  };
 
-const latest = snap.docs
-  .map((d) => ({ id: d.id, ...(d.data() as Omit<DispatchRecord, "id">) }) as DispatchRecord)
-  .find(d =>
-    d.status === "Dispatched" &&
-    d.responders?.some((r: any) => r.teamName === teamName || r.team === teamName)
-  );
+  const closeResponderModal = () => {
+    setShowResponderModal(false);
+    setSelectedAlert(null);
+    setSelectedResponderIds(new Set());
+    setPendingDispatchIds(null);
+  };
 
+  const closeAlertModal = () => {
+    setAlerts([]);
+    setPendingDispatchIds(null);
+    setSelectedAlert(null);
+  };
 
-  if (!latest) {
-    alert("No dispatch record found for this team.");
-    return;
-  }
-
-  setSelectedDispatch(latest);
-  setShowDispatchInfoModal(true);
-};
-
-
-
-  
-  
-
-  // ---------------------------
-  // Load responders (real-time)
-  // ---------------------------
   useEffect(() => {
     const unsub = onSnapshot(
       query(collection(db, "users"), where("role", "==", "responder")),
       (snap) => {
         setResponders(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
         setLoading(false);
-      }
+      },
     );
     return () => unsub();
   }, []);
 
-  // ---------------------------
-  // Load vehicles (real-time)
-  // ---------------------------
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "vehicles"), (snap) => {
       setVehicles(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -198,9 +145,6 @@ const latest = snap.docs
     return () => unsub();
   }, []);
 
-  // ---------------------------
-  // Load teams (real-time)
-  // ---------------------------
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "teams"), (snap) => {
       setTeams(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -208,14 +152,10 @@ const latest = snap.docs
     return () => unsub();
   }, []);
 
-  // ---------------------------
-  // Filtering (search by team or vehicle or status)
-  // ---------------------------
   const filteredResponders = responders.filter((r) => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return true;
 
-    // r.teamName is used in many places in your code — fallback to empty string
     const rTeamName = (r.teamName || "").toLowerCase();
 
     return (
@@ -223,60 +163,46 @@ const latest = snap.docs
       vehicles.some(
         (v) =>
           (v.assignedTeam || "").toLowerCase() === rTeamName &&
-          (v.code || "").toLowerCase().includes(term)
+          (v.code || "").toLowerCase().includes(term),
       ) ||
       (r.status || "").toLowerCase().includes(term)
     );
   });
 
-  // ---------------------------
-  // Group responders by teamName + vehicle assigned to team
-  // ---------------------------
- const groupedList = teams
-  .map(team => {
-    // ✅ take only responders that belong to THIS team
-    const members = filteredResponders.filter(r => r.teamId === team.id);
+  const groupedList = teams
+    .map((team) => {
+      const members = filteredResponders.filter((r) => r.teamId === team.id);
+      if (members.length === 0) return null;
 
-    // ❌ skip teams with NO members
-    if (members.length === 0) return null;
+      const vehicle =
+        vehicles.find((v) => v.assignedTeamId === team.id)?.code || "Unassigned";
 
-    // ✅ find vehicle assigned to this team
-    const vehicle =
-      vehicles.find(v => v.assignedTeamId === team.id)?.code || "Unassigned";
+      const statuses = members.map((m) => m.status);
 
-    const statuses = members.map(m => m.status);
+      let status = "Unavailable";
+      if (statuses.some((s) => s === "Available")) status = "Available";
+      if (statuses.every((s) => s === "Dispatched")) status = "Dispatched";
 
-    let status = "Unavailable";
-    if (statuses.some(s => s === "Available")) status = "Available";
-    if (statuses.every(s => s === "Dispatched")) status = "Dispatched";
+      return {
+        team: team.teamName,
+        vehicle,
+        responders: members,
+        status,
+      };
+    })
+    .filter(Boolean);
 
-    return {
-      team: team.teamName,
-      vehicle,
-      responders: members,
-      status
-    };
-  })
-  .filter(Boolean); // ✅ removes nulls
-
-
-  // ---------------------------
-  // Open alert modal (fetch pending alerts)
-  // ---------------------------
   const openAlertModal = async () => {
-    const [alertsSnap, backupSnap] = await Promise.all([
-      getDocs(
-        query(collection(db, "alerts"), where("status", "==", "Pending"), orderBy("timestamp", "desc"))
-      ),
-      getDocs(collection(db, "backup_requests")),
-    ]);
+    const alertsSnap = await getDocs(
+      query(collection(db, "alerts"), orderBy("timestamp", "desc")),
+    );
 
-    const pending = [
-      ...alertsSnap.docs.map((d) => normalizeIncident(d.id, d.data(), "alerts")),
-      ...backupSnap.docs
-        .map((d) => normalizeIncident(d.id, d.data(), "backup_requests"))
-        .filter((item) => isOpenBackupRequest(item)),
-    ].sort((a, b) => timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp));
+    const pending = alertsSnap.docs
+      .map((d) => normalizeIncident(d.id, d.data()))
+      .filter((item) => normalizeStatus(item.status) === "pending")
+      .sort(
+        (a, b) => timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp),
+      );
 
     if (pending.length === 0) {
       window.alert("No pending alerts found.");
@@ -286,7 +212,6 @@ const latest = snap.docs
     setAlerts(pending);
   };
 
-  // Select alert for dispatch
   const selectAlertForDispatch = (alert: any) => {
     setSelectedAlert(alert);
 
@@ -299,40 +224,55 @@ const latest = snap.docs
     setAlerts([]);
   };
 
-  // Toggle responder checkbox inside confirmation modal
-  const toggleResponder = (id: string) => {
-    setSelectedResponderIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+  const viewDispatchInfo = async (teamName: string) => {
+    type DispatchRecord = {
+      id: string;
+      status?: string;
+      responders?: Array<{ teamName?: string; team?: string }>;
+      [key: string]: unknown;
+    };
+
+    const snap = await getDocs(
+      query(collection(db, "dispatches"), orderBy("timestamp", "desc")),
+    );
+
+    const latest = snap.docs
+      .map(
+        (d) =>
+          ({ id: d.id, ...(d.data() as Omit<DispatchRecord, "id">) }) as DispatchRecord,
+      )
+      .find(
+        (d) =>
+          d.status === "Dispatched" &&
+          d.responders?.some(
+            (r: any) => r.teamName === teamName || r.team === teamName,
+          ),
+      );
+
+    if (!latest) {
+      alert("No dispatch record found for this team.");
+      return;
+    }
+
+    setSelectedDispatch(latest);
+    setShowDispatchInfoModal(true);
   };
 
-  // ---------------------------
-  // Dispatch responders
-  // - updates:
-  //    * create a dispatch record
-  //    * set selected users status -> "Dispatched"
-  //    * set alert status -> "Dispatched"
-  //    * set team.status and vehicle.status -> "Dispatched" for affected teams/vehicles
-  // ---------------------------
   const dispatchResponders = async () => {
     if (!selectedAlert) return alert("Select an alert first.");
+    if (selectedResponderIds.size === 0) {
+      return alert("No team members selected for dispatch.");
+    }
 
-    if (selectedResponderIds.size === 0) return alert("Please select at least one responder.");
-
-    // Only dispatch responders who are still Available
     const respondersList = responders.filter(
-      (r) => selectedResponderIds.has(r.id) && r.status === "Available"
+      (r) => selectedResponderIds.has(r.id) && r.status === "Available",
     );
-    if (respondersList.length === 0) return alert("No available responders selected.");
+    if (respondersList.length === 0) {
+      return alert("No available responders selected.");
+    }
 
     try {
-      const baseAlertId = selectedAlert.__baseAlertId || selectedAlert.alertId || selectedAlert.id;
+      const baseAlertId = selectedAlert.id;
       const batch = writeBatch(db);
       const currentUser = auth.currentUser;
 
@@ -343,32 +283,36 @@ const latest = snap.docs
           if (userDoc.exists()) {
             const data = userDoc.data();
             dispatchedByName =
-              data.name || currentUser.displayName || currentUser.email || "Admin Panel";
+              data.name ||
+              currentUser.displayName ||
+              currentUser.email ||
+              "Admin Panel";
           } else {
-            dispatchedByName = currentUser.displayName || currentUser.email || "Admin Panel";
+            dispatchedByName =
+              currentUser.displayName || currentUser.email || "Admin Panel";
           }
         } catch (error) {
           console.error("Error reading dispatcher name:", error);
-          dispatchedByName = currentUser.displayName || currentUser.email || "Admin Panel";
+          dispatchedByName =
+            currentUser.displayName || currentUser.email || "Admin Panel";
         }
       }
 
-      const responderEmails = respondersList.map((r) => (r.email || "").toLowerCase());
+      const responderEmails = respondersList.map((r) =>
+        (r.email || "").toLowerCase(),
+      );
 
-      // Multiple team dispatches allowed for same incident
-
-      // create dispatch document
       const dispatchRef = doc(collection(db, "dispatches"));
 
       batch.set(dispatchRef, {
         alertId: baseAlertId,
-        backupRequestId: selectedAlert.__isBackupRequest ? selectedAlert.id : "",
         alertType: selectedAlert.type,
         alertLocation: selectedAlert.location,
         snapshotUrl: selectedAlert.snapshotUrl || null,
-        dispatchType: selectedAlert.__isBackupRequest ? "Backup" : "Primary",
-        isBackup: Boolean(selectedAlert.__isBackupRequest),
-        requestSource: selectedAlert.__source || "alerts",
+        snapshotBase64: selectedAlert.snapshotBase64 || null,
+        dispatchType: "Primary",
+        isBackup: false,
+        requestSource: "alerts",
         responders: respondersList.map((r) => ({
           id: r.id,
           name: r.name,
@@ -386,22 +330,15 @@ const latest = snap.docs
         dispatchedBy: dispatchedByName,
       });
 
-      // update each responder doc -> Dispatched
       respondersList.forEach((r) => {
         batch.update(doc(db, "users", r.id), { status: "Dispatched" });
       });
 
-      // update alert doc -> Dispatched
-      batch.update(
-        doc(
-          db,
-          selectedAlert.__source === "backup_requests" ? "backup_requests" : "alerts",
-          selectedAlert.id
-        ),
-        { status: "Dispatched", dispatchStatus: "Dispatched" }
-      );
+      batch.update(doc(db, "alerts", selectedAlert.id), {
+        status: "Dispatched",
+        dispatchStatus: "Dispatched",
+      });
 
-      // update teams & vehicles to Dispatched
       const affectedTeamIds = new Set<string>();
       const affectedTeamNames = new Set<string>();
 
@@ -425,9 +362,14 @@ const latest = snap.docs
         vehicles.forEach((v) => {
           if (
             (v.assignedTeam || "") === tname ||
-            (v.assignedTeamId && teams.find((tt) => tt.id === v.assignedTeamId && tt.teamName === tname))
+            (v.assignedTeamId &&
+              teams.find(
+                (tt) => tt.id === v.assignedTeamId && tt.teamName === tname,
+              ))
           ) {
-            batch.update(doc(db, "vehicles", v.id), { status: "Dispatched" });
+            batch.update(doc(db, "vehicles", v.id), {
+              status: "Dispatched",
+            });
           }
         });
       });
@@ -472,9 +414,7 @@ const latest = snap.docs
         });
       }
 
-      setShowResponderModal(false);
-      setSelectedResponderIds(new Set());
-      setSelectedAlert(null);
+      closeResponderModal();
       setShowSuccessModal(true);
 
       setTimeout(() => setShowSuccessModal(false), 2500);
@@ -484,11 +424,10 @@ const latest = snap.docs
     }
   };
 
-  // ---------------------------
-  // Click dispatch button in main table (collect available responders in group)
-  // ---------------------------
   const handleDispatchTeam = (group: any) => {
-    const availableIds = group.responders.filter((r: any) => r.status === "Available").map((r: any) => r.id);
+    const availableIds = group.responders
+      .filter((r: any) => r.status === "Available")
+      .map((r: any) => r.id);
 
     if (availableIds.length === 0) {
       return alert("No available responders to dispatch.");
@@ -498,26 +437,15 @@ const latest = snap.docs
     openAlertModal();
   };
 
-  // ---------------------------
-  // AUTO-RESET LOGIC (runs whenever responders, teams or vehicles change)
-  //
-  // Conditions:
-  //  A) If the team leader becomes Available -> reset all team members, the team doc, and its assigned vehicle to "Available"
-  //  B) If ALL responders in a team are Available -> same reset
-  //
-  // Important: this uses a batch and will update all affected docs atomically for each team.
-  // ---------------------------
   useEffect(() => {
-    // need data to be loaded first
-    if (responders.length === 0 || teams.length === 0 || vehicles.length === 0) return;
+    if (responders.length === 0 || teams.length === 0 || vehicles.length === 0) {
+      return;
+    }
 
-    // Iterate teams and decide whether to reset
     teams.forEach((team) => {
-      // team may have fields: id, teamName, leaderId
       const teamId = team.id;
       const teamName = team.teamName || "";
 
-      // gather members (match by teamId OR teamName)
       const teamMembers = responders.filter((r) => {
         if (r.teamId && teamId) return r.teamId === teamId;
         return (r.teamName || "") === teamName;
@@ -525,60 +453,51 @@ const latest = snap.docs
 
       if (teamMembers.length === 0) return;
 
-      // find leader (by leaderId)
       const leaderId = team.leaderId;
-      const leader = leaderId ? teamMembers.find((m) => m.id === leaderId) : undefined;
+      const leader = leaderId
+        ? teamMembers.find((m) => m.id === leaderId)
+        : undefined;
 
       const leaderResolved = leader && leader.status === "Available";
       const allAvailable = teamMembers.every((m) => m.status === "Available");
 
-      // if neither condition true => skip
       if (!leaderResolved && !allAvailable) return;
 
-      // else perform reset for this team
       const batch = writeBatch(db);
 
-      // Reset all team members to Available (only if they aren't already)
       teamMembers.forEach((m) => {
         if (m.status !== "Available") {
           batch.update(doc(db, "users", m.id), { status: "Available" });
         }
       });
 
-      // Reset team doc status
       batch.update(doc(db, "teams", teamId), { status: "Available" });
 
-      // Reset associated vehicle (find by assignedTeam OR assignedTeamId)
       const vehicle = vehicles.find(
         (v) =>
           (v.assignedTeam && v.assignedTeam === teamName) ||
-          (v.assignedTeamId && v.assignedTeamId === teamId)
+          (v.assignedTeamId && v.assignedTeamId === teamId),
       );
 
       if (vehicle) {
-        batch.update(doc(db, "vehicles", vehicle.id), { status: "Available" });
+        batch.update(doc(db, "vehicles", vehicle.id), {
+          status: "Available",
+        });
       }
 
-      // commit the reset for this team
-      batch.commit().catch((err) => console.error("Auto-reset commit failed:", err));
-      // console log for debugging
-      console.log(`Auto-reset applied for team ${teamName} (leaderResolved=${!!leaderResolved}, allAvailable=${allAvailable})`);
+      batch
+        .commit()
+        .catch((err) => console.error("Auto-reset commit failed:", err));
     });
   }, [responders, teams, vehicles]);
 
-  // ---------------------------
-  // UI
-  // ---------------------------
   return (
     <div className={styles.pageWrapper}>
       <AdminHeader />
 
-      <div style={{ position: "absolute", top: 20, right: 30 }}>
-        <AlertBellButton />
-      </div>
+      <AlertBellButton />
+      <AdminTutorialChat />
 
-      {/* Note: you already have an AlertDispatchModal component in your project.
-          Keeping it here but the page's own logic also supports team/vehicle updates. */}
       <AlertDispatchModal />
 
       <div className={styles.container}>
@@ -586,7 +505,11 @@ const latest = snap.docs
           <h2 className={styles.pageTitle}>Team & Truck Dispatch</h2>
           <hr className={styles.separator} />
 
-          {/* SEARCH */}
+          <div className={styles.infoBox}>
+            <FaInfoCircle className={styles.infoIcon} />
+            <p className={styles.infoText}>{getPageDescription()}</p>
+          </div>
+
           <div className={styles.searchWrapper}>
             <FaSearch className={styles.searchIcon} />
             <input
@@ -598,177 +521,201 @@ const latest = snap.docs
             />
           </div>
 
-          {/* GROUP TABLE */}
-          <table className={styles.userTable}>
-            <thead>
-              <tr>
-                <th>Team</th>
-                <th>Truck</th>
-                <th>Members</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {loading ? (
+          <div className={styles.tableScroll}>
+            <table className={styles.userTable}>
+              <thead>
                 <tr>
-                  <td colSpan={5} style={{ textAlign: "center", padding: 20 }}>
-                    Loading...
-                  </td>
+                  <th>Team</th>
+                  <th>Truck</th>
+                  <th>Members</th>
+                  <th>Status</th>
+                  <th>Action</th>
                 </tr>
-              ) : groupedList.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: "center", padding: 20 }}>
-                    No groups found.
-                  </td>
-                </tr>
-              ) : (
-                groupedList.map((group: any, idx: number) => (
-                  <tr key={idx}>
-                    <td>{group.team}</td>
-                    <td>{group.vehicle}</td>
-                    <td>{group.responders.length}</td>
-                    <td>
-                      <span
-                        className={
-                          group.status === "Available"
-                            ? styles.statusAvailable
-                            : group.status === "Dispatched"
-                            ? styles.statusDispatched
-                            : styles.statusUnavailable
-                        }
-                      >
-                        {group.status}
-                      </span>
-                    </td>
-                    <td>
-                      {group.status === "Available" && (
-                        <button
-                          className={styles.dispatchBtn}
-                          onClick={() => handleDispatchTeam(group)}
-                        >
-                          <FaTruck /> Dispatch Team
-                        </button>
-                      )}
+              </thead>
 
-                      {group.status === "Dispatched" && (
-                        <button
-                          className={styles.viewBtn}
-                          onClick={() => viewDispatchInfo(group.team)}
-                        >
-                          View Alert
-                        </button>
-                      )}
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className={styles.emptyTableMessage}>
+                      Loading...
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : groupedList.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className={styles.emptyTableMessage}>
+                      No groups found.
+                    </td>
+                  </tr>
+                ) : (
+                  groupedList.map((group: any, idx: number) => (
+                    <tr
+                      key={idx}
+                      className={
+                        group.status === "Dispatched" ? styles.clickableRow : ""
+                      }
+                    >
+                      <td data-label="Team">{group.team}</td>
+                      <td data-label="Truck">{group.vehicle}</td>
+                      <td data-label="Members">{group.responders.length}</td>
+                      <td data-label="Status">
+                        <span className={getStatusClass(group.status)}>
+                          {group.status}
+                        </span>
+                      </td>
+                      <td data-label="Action">
+                        {group.status === "Available" && (
+                          <button
+                            className={styles.dispatchBtn}
+                            onClick={() => handleDispatchTeam(group)}
+                          >
+                            <span>
+                              <FaTruck /> Dispatch Team
+                            </span>
+                          </button>
+                        )}
+
+                        {group.status === "Dispatched" && (
+                          <button
+                            className={styles.viewBtn}
+                            onClick={() => viewDispatchInfo(group.team)}
+                          >
+                            <span>View Alert</span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      {/* MODALS + SUCCESS */}
       {alerts.length > 0 && !showResponderModal && selectedAlert === null && (
-        <div className={styles.modalOverlay} onClick={() => setAlerts([])}>
+        <div className={styles.modalOverlay} onClick={closeAlertModal}>
           <div className={styles.modalWide} onClick={(e) => e.stopPropagation()}>
-            <h3 className={styles.modalTitle}>Select Alert</h3>
-
-            <div className={styles.tableScroll}>
-              <table className={styles.alertTable}>
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th>Reporter</th>
-                    <th>Contact</th>
-                    <th>Address</th>
-                    <th>Select</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {alerts.map((a) => (
-                    <tr key={a.id}>
-                      <td>{a.__isBackupRequest ? "Backup Request" : a.type}</td>
-                      <td>{a.userName}</td>
-                      <td>{a.userContact}</td>
-                      <td>{a.userAddress}</td>
-                      <td>
-                        <button className={styles.assignBtn} onClick={() => selectAlertForDispatch(a)}>
-                          Select
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Select Alert</h3>
             </div>
 
-            <button className={styles.closeBtn} onClick={() => setAlerts([])}>
-              Close
-            </button>
+            <div className={styles.modalBody}>
+              <div className={styles.tableScroll}>
+                <table className={styles.alertTable}>
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Reporter</th>
+                      <th>Contact</th>
+                      <th>Address</th>
+                      <th>Time</th>
+                      <th>Select</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {alerts.map((a) => (
+                      <tr key={a.id}>
+                        <td data-label="Type">
+                          <div className={styles.typeWrapper}>
+                            <span className={styles.typeText}>
+                              {getBaseType(a)}
+                            </span>
+                            {getTypeBadge(a) && (
+                              <span className={styles.typeBadgeAlt}>
+                                {getTypeBadge(a)}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td data-label="Reporter">{a.userName}</td>
+                        <td data-label="Contact">{a.userContact}</td>
+                        <td
+                          data-label="Address"
+                          className={styles.addressCell}
+                          title={a.userAddress}
+                        >
+                          {a.userAddress && a.userAddress.length > 40
+                            ? a.userAddress.substring(0, 40) + "..."
+                            : a.userAddress}
+                        </td>
+                        <td data-label="Time">
+                          {a.timestamp?.seconds
+                            ? new Date(a.timestamp.seconds * 1000).toLocaleString()
+                            : "Unknown"}
+                        </td>
+                        <td data-label="Select">
+                          <button
+                            className={styles.assignBtn}
+                            onClick={() => selectAlertForDispatch(a)}
+                          >
+                            <span>Select</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className={styles.modalFooter}>
+              <button className={styles.closeBtn} onClick={closeAlertModal}>
+                <span>Close</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {showResponderModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowResponderModal(false)}>
+        <div className={styles.modalOverlay} onClick={closeResponderModal}>
           <div className={styles.modalWide} onClick={(e) => e.stopPropagation()}>
-            <h3 className={styles.modalTitle}>Confirm Responders</h3>
-
-            <p>
-              <strong>Alert:</strong> {selectedAlert?.type || "Manual"} — {selectedAlert?.location}
-            </p>
-
-            <div className={styles.tableScroll}>
-              <table className={styles.responderTable}>
-                <thead>
-                  <tr>
-                    <th>Select</th>
-                    <th>Name</th>
-                    <th>Contact</th>
-                    <th>Team</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {responders
-                    .filter((r) => selectedResponderIds.has(r.id))
-                    .map((r) => (
-                      <tr key={r.id}>
-                        <td>
-                          <input type="checkbox" checked={selectedResponderIds.has(r.id)} onChange={() => toggleResponder(r.id)} />
-                        </td>
-                        <td>{r.name}</td>
-                        <td>{r.contact || "—"}</td>
-                        <td>{r.teamName || r.team || "Unassigned"}</td>
-
-                        <td>
-                          <span
-                            className={
-                              r.status === "Available"
-                                ? styles.statusAvailable
-                                : r.status === "Dispatched"
-                                ? styles.statusDispatched
-                                : styles.statusUnavailable
-                            }
-                          >
-                            {r.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Dispatch Team Members</h3>
             </div>
 
-            <button className={styles.assignBtn} onClick={dispatchResponders}>
-              Dispatch Selected
-            </button>
-            <button className={styles.closeBtn} onClick={() => setShowResponderModal(false)}>
-              Close
-            </button>
+            <div className={styles.modalBody}>
+              <div className={styles.tableScroll}>
+                <table className={styles.responderTable}>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Contact</th>
+                      <th>Team</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {responders
+                      .filter((r) => selectedResponderIds.has(r.id))
+                      .map((r) => (
+                        <tr key={r.id}>
+                          <td data-label="Name">{r.name}</td>
+                          <td data-label="Contact">{r.contact || "—"}</td>
+                          <td data-label="Team">
+                            {r.teamName || r.team || "Unassigned"}
+                          </td>
+                          <td data-label="Status">
+                            <span className={getStatusClass(r.status)}>
+                              {r.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className={styles.modalFooter}>
+              <button className={styles.assignBtn} onClick={dispatchResponders}>
+                <span>Dispatch Selected</span>
+              </button>
+              <button className={styles.closeBtn} onClick={closeResponderModal}>
+                <span>Close</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -777,66 +724,91 @@ const latest = snap.docs
         <div className={styles.modalOverlay}>
           <div className={styles.successModal}>
             <div className={styles.successIcon}>✔</div>
-            <h3>Dispatch Successful!</h3>
+            <h3 className={styles.successTitle}>Dispatch Successful!</h3>
+            <p className={styles.successMessage}>
+              The selected responders have been dispatched successfully.
+            </p>
           </div>
         </div>
       )}
+
       {showDispatchInfoModal && selectedDispatch && (
-  <div className={styles.modalOverlay} onClick={() => setShowDispatchInfoModal(false)}>
-    <div className={styles.modalWide} onClick={(e) => e.stopPropagation()}>
-     <h3 className={styles.modalTitle}>Dispatch Details</h3>
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setShowDispatchInfoModal(false)}
+        >
+          <div className={styles.modalWide} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Dispatch Details</h3>
+            </div>
 
-<div className={styles.section}>
-  <p><strong>Alert Type:</strong> {selectedDispatch.alertType}</p>
-  <p><strong>Location:</strong> {selectedDispatch.alertLocation}</p>
-  <p><strong>Dispatched By:</strong> {selectedDispatch.dispatchedBy}</p>
-  <p>
-    <strong>Time:</strong>{" "}
-    {selectedDispatch.timestamp
-      ? new Date(selectedDispatch.timestamp.seconds * 1000).toLocaleString()
-      : "—"}
-  </p>
-</div>
+            <div className={styles.modalBody}>
+              <div className={styles.alertPreviewInfo}>
+                <p>
+                  <strong>Alert Type:</strong> {selectedDispatch.alertType}
+                </p>
+                <p>
+                  <strong>Location:</strong> {selectedDispatch.alertLocation}
+                </p>
+                <p>
+                  <strong>Dispatched By:</strong> {selectedDispatch.dispatchedBy}
+                </p>
+                <p>
+                  <strong>Time:</strong>{" "}
+                  {selectedDispatch.timestamp
+                    ? new Date(
+                        selectedDispatch.timestamp.seconds * 1000,
+                      ).toLocaleString()
+                    : "—"}
+                </p>
+              </div>
 
-<hr className={styles.divider} />
+              <div className={styles.alertPreviewInfo}>
+                <p>
+                  <strong>Reported By:</strong> {selectedDispatch.userReported}
+                </p>
+                <p>
+                  <strong>Contact:</strong> {selectedDispatch.userContact}
+                </p>
+                <p>
+                  <strong>Email:</strong> {selectedDispatch.userEmail}
+                </p>
+                <p>
+                  <strong>Address:</strong> {selectedDispatch.userAddress}
+                </p>
+              </div>
 
-<div className={styles.section}>
-  <h4>Reported By:</h4>
-  <p><strong>Name:</strong> {selectedDispatch.userReported}</p>
-  <p><strong>Contact:</strong> {selectedDispatch.userContact}</p>
-  <p><strong>Email:</strong> {selectedDispatch.userEmail}</p>
-  <p><strong>Address:</strong> {selectedDispatch.userAddress}</p>
-</div>
+              <div className={styles.alertPreviewInfo}>
+                <p>
+                  <strong>Responders:</strong>
+                </p>
+                <ul className={styles.responderList}>
+                  {selectedDispatch.responders?.map((r: any) => (
+                    <li key={r.id}>
+                      <strong>{r.name}</strong> — {r.teamName}
+                      <br />
+                      <small>
+                        {r.contact} | {r.email}
+                      </small>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
 
-<hr className={styles.divider} />
-
-<div className={styles.section}>
-  <h4>Responders:</h4>
-  <ul className={styles.responderList}>
-    {selectedDispatch.responders?.map((r: any) => (
-      <li key={r.id}>
-        <strong>{r.name}</strong> — {r.teamName}  
-        <br />
-        <small>{r.contact} | {r.email}</small>
-      </li>
-    ))}
-  </ul>
-</div>
-
-
-      <button className={styles.closeBtn} onClick={() => setShowDispatchInfoModal(false)}>
-        Close
-      </button>
+            <div className={styles.modalFooter}>
+              <button
+                className={styles.closeBtn}
+                onClick={() => setShowDispatchInfoModal(false)}
+              >
+                <span>Close</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  </div>
-)}
-
-    </div>
-    
   );
-  
 };
-
-
 
 export default DispatchPage;

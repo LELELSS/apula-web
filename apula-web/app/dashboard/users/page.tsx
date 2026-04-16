@@ -4,13 +4,16 @@ import React, { useEffect, useMemo, useState } from "react";
 import AdminHeader from "@/components/shared/adminHeader";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
+import AdminTutorialChat from "@/components/Chatbot/AdminTutorialChat";
 import styles from "./userpagestyles.module.css";
 import {
   FaUsers,
   FaUserShield,
   FaUserTie,
   FaUser,
+  FaUserEdit,
   FaSearch,
+  FaInfoCircle,
 } from "react-icons/fa";
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -88,10 +91,10 @@ export default function UsersPage() {
 
   const totalAll = users.length;
   const totalAdmins = users.filter(
-    (u) => norm(u.role) === "admin" || norm(u.role) === "superadmin",
+    (u) => norm(u.role) === "admin" || norm(u.role) === "superadmin"
   ).length;
   const totalResponders = users.filter(
-    (u) => norm(u.role) === "responder",
+    (u) => norm(u.role) === "responder"
   ).length;
   const totalUsers = users.filter((u) => norm(u.role) === "user").length;
 
@@ -131,7 +134,7 @@ export default function UsersPage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedUsers = filteredUsers.slice(
     startIndex,
-    startIndex + itemsPerPage,
+    startIndex + itemsPerPage
   );
 
   const openModal = (user: User) => setSelectedUser(user);
@@ -161,6 +164,24 @@ export default function UsersPage() {
     } catch {}
 
     return String(createdAt);
+  };
+
+  const getUsersDescription = () => {
+    const count = filteredUsers.length;
+
+    if (selectedRole === "Admin") {
+      return `This table shows administrator accounts, including admin and superadmin users. A total of ${count} account${count === 1 ? "" : "s"} match the current filter.`;
+    }
+
+    if (selectedRole === "Responder") {
+      return `This table shows responder accounts responsible for field response and incident validation. A total of ${count} responder account${count === 1 ? "" : "s"} match the current filter.`;
+    }
+
+    if (selectedRole === "User") {
+      return `This table shows standard user accounts that can access the system and submit reports or requests. A total of ${count} user account${count === 1 ? "" : "s"} match the current filter.`;
+    }
+
+    return `This table shows all registered accounts in the system, including administrators, responders, and users. A total of ${count} account${count === 1 ? "" : "s"} match the current view.`;
   };
 
   const handleSave = async () => {
@@ -238,8 +259,8 @@ export default function UsersPage() {
                 role: editTarget.role,
                 status: editTarget.status,
               }
-            : u,
-        ),
+            : u
+        )
       );
 
       setShowSuccess(true);
@@ -258,9 +279,8 @@ export default function UsersPage() {
     <div>
       <AdminHeader />
 
-      <div style={{ position: "absolute", top: 20, right: 30, zIndex: 50 }}>
-        <AlertBellButton />
-      </div>
+      <AlertBellButton />
+      <AdminTutorialChat />
 
       <AlertDispatchModal />
 
@@ -338,6 +358,14 @@ export default function UsersPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className={styles.usersInfoBox}>
+              <div className={styles.usersInfoIcon}>
+                <FaInfoCircle size={16} />
+              </div>
+
+              <p className={styles.usersInfoText}>{getUsersDescription()}</p>
             </div>
 
             <table className={styles.userTable}>
@@ -431,34 +459,77 @@ export default function UsersPage() {
             className={styles.modalContent}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className={styles.modalTitle}>User Information</h3>
+            <div className={styles.modalHeader}>
+              <div className={styles.modalHeaderIconBox}>
+                <div className={`${styles.modalHeaderIcon} ${styles.userModalIcon}`}>
+                  <FaUser size={24} />
+                </div>
+              </div>
+
+              <div className={styles.modalHeaderTitleBox}>
+                <h3 className={styles.modalTitle}>User Information</h3>
+                <p className={styles.modalSubtitle}>
+                  Account details and registration information
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.modalDivider}></div>
 
             <div className={styles.modalDetails}>
-              <p>
-                <strong>ID:</strong> {selectedUser.id}
-              </p>
-              <p>
-                <strong>Name:</strong> {selectedUser.name ?? "N/A"}
-              </p>
-              <p>
-                <strong>Role:</strong> {selectedUser.role ?? "N/A"}
-              </p>
-              <p>
-                <strong>Contact:</strong> {selectedUser.contact ?? "N/A"}
-              </p>
-              <p>
-                <strong>Address:</strong> {selectedUser.address ?? "N/A"}
-              </p>
-              <p>
-                <strong>Email:</strong> {selectedUser.email ?? "N/A"}
-              </p>
-              <p>
-                <strong>Created Time:</strong>{" "}
-                {formatCreatedAt(
-                  selectedUser.createdAt,
-                  selectedUser.created_time,
-                )}
-              </p>
+              <h4 className={styles.modalSectionTitle}>Details</h4>
+
+              <div className={styles.modalInfoGrid}>
+                <div className={styles.modalInfoRow}>
+                  <span className={styles.modalLabel}>Name</span>
+                  <span className={styles.modalValue}>
+                    {selectedUser.name ?? "N/A"}
+                  </span>
+                </div>
+
+                <div className={styles.modalInfoRow}>
+                  <span className={styles.modalLabel}>Role</span>
+                  <span className={styles.modalValue}>
+                    {selectedUser.role ?? "N/A"}
+                  </span>
+                </div>
+
+                <div className={styles.modalInfoRow}>
+                  <span className={styles.modalLabel}>Contact</span>
+                  <span className={styles.modalValue}>
+                    {selectedUser.contact ?? "N/A"}
+                  </span>
+                </div>
+
+                <div className={styles.modalInfoRow}>
+                  <span className={styles.modalLabel}>Email</span>
+                  <span className={styles.modalValue}>
+                    {selectedUser.email ?? "N/A"}
+                  </span>
+                </div>
+
+                <div className={styles.modalInfoRow}>
+                  <span className={styles.modalLabel}>Address</span>
+                  <span className={styles.modalValue}>
+                    {selectedUser.address ?? "N/A"}
+                  </span>
+                </div>
+
+                <div className={styles.modalInfoRow}>
+                  <span className={styles.modalLabel}>Created</span>
+                  <span className={styles.modalValue}>
+                    {formatCreatedAt(
+                      selectedUser.createdAt,
+                      selectedUser.created_time
+                    )}
+                  </span>
+                </div>
+
+                <div className={styles.modalInfoRow}>
+                  <span className={styles.modalLabel}>User ID</span>
+                  <span className={styles.modalValue}>{selectedUser.id}</span>
+                </div>
+              </div>
             </div>
 
             <button className={styles.closeBtn} onClick={closeModal}>
@@ -477,7 +548,22 @@ export default function UsersPage() {
             className={styles.modalContentEdit}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className={styles.modalTitle}>Edit User Account</h3>
+            <div className={styles.modalHeader}>
+              <div className={styles.modalHeaderIconBox}>
+                <div className={`${styles.modalHeaderIcon} ${styles.userModalIcon}`}>
+                  <FaUserEdit size={24} />
+                </div>
+              </div>
+
+              <div className={styles.modalHeaderTitleBox}>
+                <h3 className={styles.modalTitle}>Edit User Account</h3>
+                <p className={styles.modalSubtitle}>
+                  Update user account details and access settings
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.modalDivider}></div>
 
             <div className={styles.formGroup}>
               <label className={styles.inputLabel}>Name</label>
@@ -486,7 +572,7 @@ export default function UsersPage() {
                 value={editTarget.name ?? ""}
                 onChange={(e) =>
                   setEditTarget((prev) =>
-                    prev ? { ...prev, name: e.target.value } : null,
+                    prev ? { ...prev, name: e.target.value } : null
                   )
                 }
                 className={styles.inputField}
@@ -508,7 +594,7 @@ export default function UsersPage() {
                             .replace(/\D/g, "")
                             .slice(0, 11),
                         }
-                      : null,
+                      : null
                   )
                 }
                 className={styles.inputField}
@@ -523,7 +609,7 @@ export default function UsersPage() {
                   value={editTarget.role ?? "user"}
                   onChange={(e) =>
                     setEditTarget((prev) =>
-                      prev ? { ...prev, role: e.target.value } : null,
+                      prev ? { ...prev, role: e.target.value } : null
                     )
                   }
                   className={styles.inputField}
@@ -542,7 +628,7 @@ export default function UsersPage() {
                 value={editTarget.status ?? "Available"}
                 onChange={(e) =>
                   setEditTarget((prev) =>
-                    prev ? { ...prev, status: e.target.value } : null,
+                    prev ? { ...prev, status: e.target.value } : null
                   )
                 }
                 className={styles.inputField}

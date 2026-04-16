@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import AdminHeader from "@/components/shared/adminHeader";
 import styles from "./tnv.module.css";
-import { FaUsers, FaTruck } from "react-icons/fa";
+import { FaUsers, FaTruck, FaInfoCircle } from "react-icons/fa";
 
 import {
   collection,
@@ -18,6 +18,7 @@ import {
 import { db } from "@/lib/firebase";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
+import AdminTutorialChat from "@/components/Chatbot/AdminTutorialChat";
 
 export default function TeamVehiclePage() {
   const [activeTab, setActiveTab] = useState<"teams" | "vehicles">("teams");
@@ -55,6 +56,14 @@ export default function TeamVehiclePage() {
       return raw;
     }
     return raw;
+  };
+
+  const getTableDescription = () => {
+    if (activeTab === "teams") {
+      return "This table displays all teams, including their assigned leader, number of members, and current status. Admins can manage team assignments, update status, or remove teams when necessary.";
+    }
+
+    return "This table displays all trucks and their assigned teams. It allows admins to monitor availability, update assignments, and manage vehicle deployment during operations.";
   };
 
   useEffect(() => {
@@ -501,7 +510,10 @@ export default function TeamVehiclePage() {
   return (
     <div className={styles.pageWrapper}>
       <AdminHeader />
+      
       <AlertBellButton />
+      <AdminTutorialChat />
+
       <AlertDispatchModal />
 
       <div className={styles.container}>
@@ -534,6 +546,11 @@ export default function TeamVehiclePage() {
 
           {activeTab === "teams" && (
             <>
+              <div className={styles.tableInfoBox}>
+                <FaInfoCircle className={styles.infoIcon} />
+                <p className={styles.tableInfoText}>{getTableDescription()}</p>
+              </div>
+
               <div
                 className={styles.headerRow}
                 style={{
@@ -624,6 +641,11 @@ export default function TeamVehiclePage() {
 
           {activeTab === "vehicles" && (
             <>
+              <div className={styles.tableInfoBox}>
+                <FaInfoCircle className={styles.infoIcon} />
+                <p className={styles.tableInfoText}>{getTableDescription()}</p>
+              </div>
+
               <div
                 className={styles.headerRow}
                 style={{

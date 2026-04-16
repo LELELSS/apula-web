@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import AdminHeader from "@/components/shared/adminHeader";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
+import AdminTutorialChat from "@/components/Chatbot/AdminTutorialChat";
+import { FaInfoCircle } from "react-icons/fa";
 import styles from "./activity.module.css";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -37,34 +39,42 @@ export default function AdminActivityPage() {
     const unsub = onAuthStateChanged(auth, async (user: any) => {
       if (!user) {
         setRole("");
+        setLogs([]);
         setLoading(false);
         return;
       }
 
       try {
         const userSnap = await getDocs(
-          query(collection(db, "users"), where("email", "==", user.email))
+          query(collection(db, "users"), where("email", "==", user.email)),
         );
+
         const first = userSnap.docs[0];
         const nextRole = String(first?.data()?.role || "");
         setRole(nextRole);
 
         if (nextRole !== "superadmin") {
+          setLogs([]);
           setLoading(false);
           return;
         }
 
         const logsSnap = await getDocs(
-          query(collection(db, "admin_activity_logs"), orderBy("createdAt", "desc"))
+          query(
+            collection(db, "admin_activity_logs"),
+            orderBy("createdAt", "desc"),
+          ),
         );
 
         setLogs(
           logsSnap.docs.map(
-            (docSnap: any) => ({ id: docSnap.id, ...docSnap.data() } as ActivityLog)
-          )
+            (docSnap: any) =>
+              ({ id: docSnap.id, ...docSnap.data() }) as ActivityLog,
+          ),
         );
       } catch (error) {
         console.error("Error loading activity logs:", error);
+        setLogs([]);
       } finally {
         setLoading(false);
       }
@@ -73,8 +83,13 @@ export default function AdminActivityPage() {
     return () => unsub();
   }, []);
 
+  const safeText = (value?: string, fallback = "—") => {
+    const text = String(value || "").trim();
+    return text ? text : fallback;
+  };
+
   const formatTime = (ts?: { seconds?: number }) => {
-    if (!ts?.seconds) return "N/A";
+    if (!ts?.seconds) return "—";
     return new Date(ts.seconds * 1000).toLocaleString();
   };
 
@@ -101,7 +116,7 @@ export default function AdminActivityPage() {
 
   const formatPath = (path?: string) => {
     const value = String(path || "").trim();
-    if (!value || value === "N/A") return "General";
+    if (!value) return "General";
 
     const map: Record<string, string> = {
       "/dashboard": "Dashboard",
@@ -128,7 +143,7 @@ export default function AdminActivityPage() {
 
   const formatAction = (action?: string) => {
     const value = String(action || "").trim();
-    if (!value) return "Activity Recorded";
+    if (!value) return "Recorded Activity";
 
     const map: Record<string, string> = {
       page_visit: "Opened a Page",
@@ -141,11 +156,15 @@ export default function AdminActivityPage() {
     };
 
     if (map[value]) return map[value];
-    return value.replace(/[\-_]/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+    return value
+      .replace(/[\-_]/g, " ")
+      .replace(/\b\w/g, (m) => m.toUpperCase());
   };
 
   const formatTarget = (targetType?: string, targetId?: string) => {
-    const base = String(targetType || "").trim().toLowerCase();
+    const base = String(targetType || "")
+      .trim()
+      .toLowerCase();
     if (!base) return "General System";
 
     if (base === "route") return "Page";
@@ -165,7 +184,7 @@ export default function AdminActivityPage() {
     }
 
     const value = String(details || "").trim();
-    if (!value) return "No additional details.";
+    if (!value) return "No details provided";
 
     return value
       .replace(/^visited\s+/i, "Visited ")
@@ -189,7 +208,7 @@ export default function AdminActivityPage() {
         const startOfDay = new Date(
           now.getFullYear(),
           now.getMonth(),
-          now.getDate()
+          now.getDate(),
         ).getTime();
         if (createdMs < startOfDay) return false;
       }
@@ -210,12 +229,15 @@ export default function AdminActivityPage() {
       }
     }
 
-    if (actionFilter !== "all" && getActionCategory(log.action) !== actionFilter) {
+    if (
+      actionFilter !== "all" &&
+      getActionCategory(log.action) !== actionFilter
+    ) {
       return false;
     }
 
-    const query = searchText.trim().toLowerCase();
-    if (!query) return true;
+    const queryText = searchText.trim().toLowerCase();
+    if (!queryText) return true;
 
     const searchBlob = [
       formatTime(log.createdAt),
@@ -235,7 +257,7 @@ export default function AdminActivityPage() {
       .join(" ")
       .toLowerCase();
 
-    return searchBlob.includes(query);
+    return searchBlob.includes(queryText);
   });
 
   useEffect(() => {
@@ -244,15 +266,17 @@ export default function AdminActivityPage() {
 
   const totalPages = Math.max(1, Math.ceil(filteredLogs.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedLogs = filteredLogs.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedLogs = filteredLogs.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  );
 
   return (
     <div className={styles.pageWrap}>
       <AdminHeader />
 
-      <div style={{ position: "absolute", top: 20, right: 30, zIndex: 50 }}>
-        <AlertBellButton />
-      </div>
+      <AlertBellButton />
+      <AdminTutorialChat />
 
       <AlertDispatchModal />
 
@@ -262,9 +286,11 @@ export default function AdminActivityPage() {
           <hr className={styles.separator} />
 
           {loading ? (
-            <p className={styles.note}>Loading activity logs...</p>
+            <p className={styles.note}>Fetching activity logs...</p>
           ) : role !== "superadmin" ? (
-            <p className={styles.note}>Only super admin can access this page.</p>
+            <p className={styles.note}>
+              Only super admin can access this page.
+            </p>
           ) : logs.length === 0 ? (
             <p className={styles.note}>No activity logs found.</p>
           ) : (
@@ -297,6 +323,7 @@ export default function AdminActivityPage() {
                 ].map((item) => (
                   <button
                     key={item.key}
+                    type="button"
                     className={`${styles.dateFilterBtn} ${
                       dateFilter === item.key ? styles.dateFilterBtnActive : ""
                     }`}
@@ -317,6 +344,7 @@ export default function AdminActivityPage() {
                 ].map((item) => (
                   <button
                     key={item.key}
+                    type="button"
                     className={`${styles.filterBtn} ${
                       actionFilter === item.key ? styles.filterBtnActive : ""
                     }`}
@@ -328,7 +356,9 @@ export default function AdminActivityPage() {
               </div>
 
               {filteredLogs.length === 0 ? (
-                <p className={styles.note}>No logs match your filter or search.</p>
+                <p className={styles.note}>
+                  No logs match your filter or search.
+                </p>
               ) : (
                 <>
                   <div className={styles.tableWrap}>
@@ -348,16 +378,33 @@ export default function AdminActivityPage() {
                         {paginatedLogs.map((log: ActivityLog) => (
                           <tr key={log.id}>
                             <td>{formatTime(log.createdAt)}</td>
-                            <td>{log.actorName || log.actorEmail || "N/A"}</td>
-                            <td>{log.actorRole || "N/A"}</td>
+                            <td>{safeText(log.actorName || log.actorEmail)}</td>
+                            <td>{safeText(log.actorRole)}</td>
                             <td>{formatAction(log.action)}</td>
-                            <td>{formatTarget(log.targetType, log.targetId)}</td>
-                            <td>{formatDetails(log.details, log.path, log.action)}</td>
+                            <td>
+                              {formatTarget(log.targetType, log.targetId)}
+                            </td>
+                            <td>
+                              {formatDetails(log.details, log.path, log.action)}
+                            </td>
                             <td>{formatPath(log.path)}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                  </div>
+
+                  <div className={styles.activityInfoBox}>
+                    <div className={styles.activityInfoIcon}>
+                      <FaInfoCircle size={16} />
+                    </div>
+
+                    <p className={styles.activityInfoText}>
+                      This table displays all recorded administrative
+                      activities. Use the filters and
+                      search bar to quickly locate specific actions, track
+                      system usage, and review recent administrative events.
+                    </p>
                   </div>
 
                   <div className={styles.pagination}>

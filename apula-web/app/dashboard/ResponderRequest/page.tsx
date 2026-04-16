@@ -15,10 +15,16 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { logActivity } from "@/lib/activityLog";
 
-import { FaUserCheck, FaUserTimes, FaSearch } from "react-icons/fa";
+import {
+  FaUserCheck,
+  FaUserTimes,
+  FaSearch,
+  FaInfoCircle,
+} from "react-icons/fa";
 import styles from "./responderRequest.module.css";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
+import AdminTutorialChat from "@/components/Chatbot/AdminTutorialChat";
 
 type Responder = {
   id: string;
@@ -197,9 +203,8 @@ const ResponderRequestsPage = () => {
     <div>
       <AdminHeader />
 
-      <div style={{ position: "absolute", top: 20, right: 30, zIndex: 50 }}>
-        <AlertBellButton />
-      </div>
+      <AlertBellButton />
+      <AdminTutorialChat />
 
       <AlertDispatchModal />
 
@@ -241,6 +246,16 @@ const ResponderRequestsPage = () => {
             </div>
 
             <div className={styles.tableSection}>
+              <div className={styles.tableInfoBox}>
+                <FaInfoCircle className={styles.infoIcon} />
+                <p className={styles.tableInfoText}>
+                  This table displays all pending account permission requests.
+                  Admins can review each verified request and choose to approve
+                  or decline access based on the user role and submitted account
+                  details.
+                </p>
+              </div>
+
               <table className={styles.userTable}>
                 <thead>
                   <tr>
@@ -265,21 +280,27 @@ const ResponderRequestsPage = () => {
                             className={styles.acceptBtn}
                             onClick={() => handleAction("accept", r)}
                           >
-                            <span className={styles.btnContent}>Accept</span>
+                            <span className={styles.btnContent}>
+                              <FaUserCheck />
+                              Accept
+                            </span>
                           </button>
 
                           <button
                             className={styles.declineBtn}
                             onClick={() => handleAction("decline", r)}
                           >
-                            <span className={styles.btnContent}>Decline</span>
+                            <span className={styles.btnContent}>
+                              <FaUserTimes />
+                              Decline
+                            </span>
                           </button>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className={styles.noResults}>
+                      <td colSpan={5} className={styles.noResults}>
                         No pending account permission requests.
                       </td>
                     </tr>

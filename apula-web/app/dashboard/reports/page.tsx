@@ -6,8 +6,10 @@ import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt } from "react-icons/fa";
 import AdminHeader from "@/components/shared/adminHeader";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
+import AdminTutorialChat from "@/components/Chatbot/AdminTutorialChat";
 import styles from "./reportStyles.module.css";
 import jsPDF from "jspdf";
+import { FaInfoCircle } from "react-icons/fa";
 
 import {
   collection,
@@ -123,6 +125,11 @@ const ReportPage = () => {
   useEffect(() => {
     let result = [...reports];
 
+    // ❌ remove resolved ALWAYS
+    result = result.filter(
+      (r) => String(r.status || "").toLowerCase() !== "resolved",
+    );
+
     if (filterStatus !== "All") {
       result = result.filter((r) => r.status === filterStatus);
     }
@@ -130,7 +137,7 @@ const ReportPage = () => {
     result = result.filter(
       (r) =>
         r.userName?.toLowerCase().includes(search.toLowerCase()) ||
-        r.userAddress?.toLowerCase().includes(search.toLowerCase())
+        r.userAddress?.toLowerCase().includes(search.toLowerCase()),
     );
 
     setFilteredReports(result);
@@ -147,7 +154,7 @@ const ReportPage = () => {
       try {
         const q = query(
           collection(db, "dispatches"),
-          where("alertId", "==", selectedReport.id)
+          where("alertId", "==", selectedReport.id),
         );
 
         const snap = await getDocs(q);
@@ -204,9 +211,7 @@ const ReportPage = () => {
   };
 
   const getTeamName = (dispatch: DispatchInfo) =>
-    dispatch.responders?.[0]?.team ||
-    dispatch.responders?.[0]?.teamId ||
-    "N/A";
+    dispatch.responders?.[0]?.team || dispatch.responders?.[0]?.teamId || "N/A";
 
   const getTeamDetails = (dispatch: DispatchInfo) => {
     const dispatchTeamName = getTeamName(dispatch);
@@ -217,8 +222,8 @@ const ReportPage = () => {
         t.members?.some(
           (member) =>
             member.teamName === dispatchTeamName ||
-            member.id === dispatch.responders?.[0]?.teamId
-        )
+            member.id === dispatch.responders?.[0]?.teamId,
+        ),
       );
 
     return matchedTeam || null;
@@ -257,7 +262,7 @@ const ReportPage = () => {
       label: string,
       value: string,
       x: number,
-      currentY: number
+      currentY: number,
     ) => {
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(11);
@@ -267,7 +272,7 @@ const ReportPage = () => {
       const labelWidth = pdf.getTextWidth(label);
       const wrapped = pdf.splitTextToSize(
         value || "N/A",
-        contentWidth - labelWidth - 10
+        contentWidth - labelWidth - 10,
       );
       pdf.text(wrapped, x + labelWidth + 6, currentY);
 
@@ -329,7 +334,7 @@ const ReportPage = () => {
 
     if (dispatches.length > 0 && dispatches[0].timestamp) {
       const dispatchedAt = new Date(
-        dispatches[0].timestamp!.seconds * 1000
+        dispatches[0].timestamp!.seconds * 1000,
       ).toLocaleString();
 
       y = addLabelValue("Dispatch Time:", dispatchedAt, margin, y);
@@ -346,7 +351,7 @@ const ReportPage = () => {
           "Confirmed At:",
           new Date(confirmedTimestamp * 1000).toLocaleString(),
           margin,
-          y
+          y,
         );
       }
 
@@ -354,7 +359,7 @@ const ReportPage = () => {
         "Confirmed By:",
         report.confirmedBy || dispatches[0]?.confirmedBy || "N/A",
         margin,
-        y
+        y,
       );
     }
 
@@ -423,7 +428,7 @@ const ReportPage = () => {
     pdf.text(
       `Generated on ${new Date().toLocaleString()}`,
       margin,
-      pageHeight - margin / 2
+      pageHeight - margin / 2,
     );
 
     pdf.save(`fire_report_${report.id}.pdf`);
@@ -433,16 +438,15 @@ const ReportPage = () => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedReports = filteredReports.slice(
     startIndex,
-    startIndex + itemsPerPage
+    startIndex + itemsPerPage,
   );
 
   return (
     <div>
       <AdminHeader />
 
-      <div style={{ position: "absolute", top: 20, right: 30, zIndex: 50 }}>
-        <AlertBellButton />
-      </div>
+      <AlertBellButton />
+      <AdminTutorialChat />
 
       <AlertDispatchModal />
 
@@ -450,6 +454,16 @@ const ReportPage = () => {
         <div className={styles.contentSection}>
           <h2 className={styles.pageTitle}>Incident Reports</h2>
           <hr className={styles.separator} />
+
+          <div className={styles.infoBox}>
+            <FaInfoCircle className={styles.infoIcon} />
+            <p className={styles.infoText}>
+              This page displays all recorded fire incident reports, including
+              reporter details, address, status, and dispatch activity. Use the
+              search bar and status filters to quickly find and review specific
+              incident records.
+            </p>
+          </div>
 
           <div className={styles.filtersRow}>
             <div className={styles.searchWrapper}>
@@ -508,7 +522,9 @@ const ReportPage = () => {
                       </td>
                       <td data-label="Received At">
                         {r.timestamp
-                          ? new Date(r.timestamp.seconds * 1000).toLocaleString()
+                          ? new Date(
+                              r.timestamp.seconds * 1000,
+                            ).toLocaleString()
                           : "Unknown"}
                       </td>
                       <td data-label="Actions">
@@ -565,7 +581,9 @@ const ReportPage = () => {
               <h3 className={styles.modalTitle}>Report Details</h3>
 
               <div className={styles.modalBody}>
-                <div className={`${styles.modalDetails} ${styles.modalSection}`}>
+                <div
+                  className={`${styles.modalDetails} ${styles.modalSection}`}
+                >
                   <p className={styles.iconRow}>
                     <FaUser />
                     {selectedReport.userName || "N/A"}
@@ -590,7 +608,7 @@ const ReportPage = () => {
                     <strong>Alert Received At:</strong>{" "}
                     {selectedReport.timestamp
                       ? new Date(
-                          selectedReport.timestamp.seconds * 1000
+                          selectedReport.timestamp.seconds * 1000,
                         ).toLocaleString()
                       : "Unknown"}
                   </p>
@@ -599,45 +617,46 @@ const ReportPage = () => {
                     <p>
                       <strong>Dispatch Time:</strong>{" "}
                       {new Date(
-                        dispatches[0].timestamp.seconds * 1000
+                        dispatches[0].timestamp.seconds * 1000,
                       ).toLocaleString()}
                     </p>
                   )}
 
-                  {selectedReport.status === "Confirmed" && (() => {
-                    const confirmedTimestamp =
-                      selectedReport.confirmedAt?.seconds ??
-                      dispatches[0]?.confirmedAt?.seconds ??
-                      selectedReport.monitoringUpdatedAt?.seconds;
+                  {selectedReport.status === "Confirmed" &&
+                    (() => {
+                      const confirmedTimestamp =
+                        selectedReport.confirmedAt?.seconds ??
+                        dispatches[0]?.confirmedAt?.seconds ??
+                        selectedReport.monitoringUpdatedAt?.seconds;
 
-                    if (
-                      !confirmedTimestamp &&
-                      !selectedReport.confirmedBy &&
-                      !dispatches[0]?.confirmedBy
-                    ) {
-                      return null;
-                    }
+                      if (
+                        !confirmedTimestamp &&
+                        !selectedReport.confirmedBy &&
+                        !dispatches[0]?.confirmedBy
+                      ) {
+                        return null;
+                      }
 
-                    return (
-                      <>
-                        {confirmedTimestamp && (
+                      return (
+                        <>
+                          {confirmedTimestamp && (
+                            <p>
+                              <strong>Confirmed At:</strong>{" "}
+                              {new Date(
+                                confirmedTimestamp * 1000,
+                              ).toLocaleString()}
+                            </p>
+                          )}
+
                           <p>
-                            <strong>Confirmed At:</strong>{" "}
-                            {new Date(
-                              confirmedTimestamp * 1000
-                            ).toLocaleString()}
+                            <strong>Confirmed By:</strong>{" "}
+                            {selectedReport.confirmedBy ||
+                              dispatches[0]?.confirmedBy ||
+                              "N/A"}
                           </p>
-                        )}
-
-                        <p>
-                          <strong>Confirmed By:</strong>{" "}
-                          {selectedReport.confirmedBy ||
-                            dispatches[0]?.confirmedBy ||
-                            "N/A"}
-                        </p>
-                      </>
-                    );
-                  })()}
+                        </>
+                      );
+                    })()}
                 </div>
 
                 {dispatches.length > 0 && (

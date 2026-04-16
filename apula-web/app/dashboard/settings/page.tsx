@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import AdminHeader from "@/components/shared/adminHeader";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
+import AdminTutorialChat from "@/components/Chatbot/AdminTutorialChat";
 import styles from "./settingsStyles.module.css";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -86,12 +87,9 @@ const SettingsPage = () => {
     <div>
       <AdminHeader />
 
-      {/* 🔔 Bell Icon */}
-      <div style={{ position: "absolute", top: 20, right: 30, zIndex: 50 }}>
-        <AlertBellButton />
-      </div>
+      <AlertBellButton />
+      <AdminTutorialChat />
 
-      {/* 🚨 Alert Dispatch Modal */}
       <AlertDispatchModal />
 
       <div className={styles.container}>

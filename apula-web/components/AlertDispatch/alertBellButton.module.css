@@ -1,6 +1,6 @@
 .floatingBell {
   position: fixed;
-  bottom: 25px;
+  bottom: 100px;
   right: 25px;
   width: 77px;
   height: 77px;
@@ -14,13 +14,40 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.25);
   cursor: pointer;
   z-index: 9999;
-  transition: transform 0.2s ease, background 0.2s ease;
+
+  /* UPDATED */
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    background 0.2s ease;
 }
 
+/* 🔥 HOVER EFFECT */
+.floatingBell:hover {
+  transform: translateY(-4px) scale(1.08);
+  box-shadow: 0 12px 25px rgba(0,0,0,0.35);
+}
+
+/* 🔔 ICON ANIMATION */
 .icon {
   font-size: 24px;
+  transition: transform 0.25s ease;
 }
 
+/* subtle shake like notification */
+.floatingBell:hover .icon {
+  animation: bellShake 0.5s ease;
+}
+
+@keyframes bellShake {
+  0% { transform: rotate(0); }
+  25% { transform: rotate(-10deg); }
+  50% { transform: rotate(10deg); }
+  75% { transform: rotate(-6deg); }
+  100% { transform: rotate(0); }
+}
+
+/* 🔴 BADGE POP EFFECT */
 .badge {
   position: absolute;
   top: -5px;
@@ -36,4 +63,55 @@
   justify-content: center;
   align-items: center;
   box-shadow: 0 0 6px rgba(0,0,0,0.2);
+
+  transition: transform 0.2s ease;
 }
+
+/* badge bounce on hover */
+.floatingBell:hover .badge {
+  transform: scale(1.15);
+}
+
+/* TOOLTIP */
+.tooltip {
+  position: absolute;
+  right: 90px; /* pushes it to the left of the bell */
+  background: #111;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+
+  opacity: 0;
+  transform: translateY(5px);
+  pointer-events: none;
+
+  transition: all 0.25s ease;
+}
+
+/* small arrow */
+.tooltip::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -5px;
+  transform: translateY(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: transparent transparent transparent #111;
+}
+
+/* SHOW ON HOVER */
+.floatingBell:hover .tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .floatingBell {
+    right: 10px;
+    bottom: 80px;
+  }
+}
+

@@ -51,7 +51,9 @@
   border: 2px solid #a30000;
   cursor: pointer;
   overflow: hidden;
-  transition: transform 0.25s ease;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 /* sliding background */
@@ -108,15 +110,59 @@
   color: white;
 }
 
-/* active card */
+/* active card = soft red accent */
 .activeCard {
-  background: #a30000;
+  background: #ffcbcb;
+  border-color: #d78b8b;
+  box-shadow: 0 6px 16px rgba(163, 0, 0, 0.08);
 }
 
+/* keep active text red by default */
 .activeCard .summaryIcon,
 .activeCard .summaryText h4,
 .activeCard .summaryText p {
+  color: #a30000;
+}
+
+/* but when active card is hovered, still slide + turn white */
+.activeCard:hover .summaryIcon,
+.activeCard:hover .summaryText h4,
+.activeCard:hover .summaryText p {
   color: white;
+}
+
+/* ===== USERS INFO BOX ===== */
+
+.usersInfoBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+  padding: 12px 14px;
+  border-radius: 12px;
+  margin-top: 10px;
+  margin-bottom: 16px;
+}
+
+.usersInfoIcon {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 8px;
+  background: #bae6fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0369a1;
+  font-size: 14px;
+}
+
+.usersInfoText {
+  font-size: 13px;
+  color: #0369a1;
+  line-height: 1.5;
+  margin: 0;
 }
 
 /* SEARCH */
@@ -159,10 +205,12 @@
 .userTable {
   width: 100%;
   border-collapse: collapse;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .userTable thead {
-  background: #a30000;
+  background: #800000;
   color: white;
 }
 
@@ -279,43 +327,135 @@
 
 .modalContent {
   background: white;
-  padding: 24px;
+  padding: 22px;
   border-radius: 16px;
   width: 100%;
-  max-width: 460px;
+  max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
-  text-align: left;
   color: black;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-height: 76px;
+}
+
+.modalHeaderIconBox {
+  width: 25%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: 10px;
+  border-right: 1px solid #e5e7eb;
+}
+
+.modalHeaderTitleBox {
+  width: 75%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 14px;
+}
+
+.modalHeaderIcon {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.userModalIcon {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
 }
 
 .modalTitle {
   color: #a30000;
   font-weight: 700;
-  font-size: 1.5rem;
-  text-align: center;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid #a30000;
+  font-size: 1.2rem;
+  margin: 0;
+  line-height: 1.2;
+  text-align: left;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
-.modalDetails p {
-  margin: 6px 0;
-  font-size: 14px;
-  color: #374151;
-  line-height: 1.5;
-  word-break: break-word;
+.modalSubtitle {
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
 }
 
-.modalDetails strong {
-  color: #a30000;
+.modalDivider {
+  width: 100%;
+  height: 1px;
+  background: #e5e7eb;
+  margin: 14px 0 12px 0;
+}
+
+.modalDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modalSectionTitle {
+  color: #111827;
+  font-size: 15px;
   font-weight: 700;
+  margin: 0;
+}
+
+.modalInfoGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modalInfoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid #ececec;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.modalLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: #a30000;
+  min-width: 82px;
+}
+
+.modalValue {
+  font-size: 12px;
+  color: #374151;
+  text-align: right;
+  word-break: break-word;
+  flex: 1;
+}
+
+.userEditModalIcon {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fcd34d;
 }
 
 .modalContentEdit {
   background: white;
-  padding: 24px;
+  padding: 22px;
   border-radius: 16px;
   width: 100%;
   max-width: 520px;

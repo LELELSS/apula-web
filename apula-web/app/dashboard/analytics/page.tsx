@@ -8,6 +8,7 @@ import styles from "./analyticsStyles.module.css";
 
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
+import AdminTutorialChat from "@/components/Chatbot/AdminTutorialChat";
 
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
@@ -661,9 +662,8 @@ Based on the available data, this report can help identify which periods experie
         <>
           <AdminHeader />
 
-          <div style={{ position: "absolute", top: 20, right: 30, zIndex: 50 }}>
-            <AlertBellButton />
-          </div>
+          <AlertBellButton />
+          <AdminTutorialChat />
 
           <AlertDispatchModal />
 

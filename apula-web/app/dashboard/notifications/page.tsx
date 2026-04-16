@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import AdminHeader from "@/components/shared/adminHeader";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
+import AdminTutorialChat from "@/components/Chatbot/AdminTutorialChat";
 import styles from "./notificationStyles.module.css";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -17,30 +18,17 @@ import {
   arrayUnion,
 } from "firebase/firestore";
 
-const normalizeStatus = (value: unknown) => String(value || "").trim().toLowerCase();
+import {
+  Flame,
+  UserPlus,
+  Users,
+  ShieldCheck,
+  BadgeCheck,
+  Bell,
+} from "lucide-react";
 
-const isOpenBackupRequest = (data: Record<string, unknown>) => {
-  const status =
-    normalizeStatus(data.status) ||
-    normalizeStatus(data.requestStatus) ||
-    normalizeStatus(data.backupStatus) ||
-    normalizeStatus(data.dispatchStatus);
-
-  if (
-    status === "resolved" ||
-    status === "closed" ||
-    status === "completed" ||
-    status === "done" ||
-    status === "approved" ||
-    status === "declined" ||
-    status === "cancelled" ||
-    status === "canceled"
-  ) {
-    return false;
-  }
-
-  return true;
-};
+const normalizeStatus = (value: unknown) =>
+  String(value || "").trim().toLowerCase();
 
 const timestampToMillis = (value: any) => {
   if (!value) return 0;
@@ -49,7 +37,23 @@ const timestampToMillis = (value: any) => {
   return 0;
 };
 
-const normalizeNotification = (id: string, data: any, source: "alerts" | "backup_requests" | "notifications") => ({
+const toTitleCase = (value: string) =>
+  value
+    .toLowerCase()
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+
+const prettyStatus = (value: string) => {
+  const clean = String(value || "Pending").trim();
+  return toTitleCase(clean);
+};
+
+const normalizeNotification = (
+  id: string,
+  data: any,
+  source: "alerts" | "backup_requests" | "notifications"
+) => ({
   id,
   ...data,
   __source: source,
@@ -58,7 +62,12 @@ const normalizeNotification = (id: string, data: any, source: "alerts" | "backup
     data?.type ||
     data?.alertType ||
     data?.requestType ||
-    (source === "backup_requests" ? "Backup Request" : source === "notifications" ? "Monitoring Notice" : "Fire Alert"),
+    data?.notificationType ||
+    (source === "backup_requests"
+      ? "backup_request"
+      : source === "notifications"
+      ? "system_notice"
+      : "fire_alert"),
   location:
     data?.location ||
     data?.alertLocation ||
@@ -70,6 +79,8 @@ const normalizeNotification = (id: string, data: any, source: "alerts" | "backup
     data?.userName ||
     data?.requestedByName ||
     data?.reportedBy ||
+    data?.responderName ||
+    data?.adminName ||
     "Unknown User",
   userAddress:
     data?.userAddress ||
@@ -84,27 +95,18 @@ const normalizeNotification = (id: string, data: any, source: "alerts" | "backup
     data?.phone ||
     data?.requestedByEmail ||
     "N/A",
-  userEmail:
-    data?.userEmail ||
-    data?.requestedByEmail ||
-    "N/A",
+  userEmail: data?.userEmail || data?.requestedByEmail || "N/A",
   description:
-    data?.description ||
-    data?.reason ||
-    data?.details ||
-    data?.message ||
-    "",
-  timestamp:
-    data?.timestamp ||
-    data?.createdAt ||
-    data?.requestedAt ||
-    null,
+    data?.description || data?.reason || data?.details || data?.message || "",
+  timestamp: data?.timestamp || data?.createdAt || data?.requestedAt || null,
   status:
     data?.status ||
     data?.requestStatus ||
     data?.backupStatus ||
     data?.dispatchStatus ||
     "Pending",
+  teamName: data?.teamName || data?.assignedTeam || "No Team",
+  adminName: data?.adminName || "Admin",
 });
 
 const isReadByUser = (notif: any, uid: string) => {
@@ -112,16 +114,109 @@ const isReadByUser = (notif: any, uid: string) => {
   return readers.includes(uid);
 };
 
-const getNotificationTag = (notif: any) => {
-  if (notif?.__source === "notifications") {
-    return { label: "System Notice", className: "typeSystem" };
+const isFireRelatedNotification = (notif: any) => {
+  const rawType = String(notif?.type || "").trim().toLowerCase();
+  const rawSource = String(notif?.__source || "").trim().toLowerCase();
+
+  return (
+    rawSource === "alerts" ||
+    rawSource === "backup_requests" ||
+    rawType.includes("fire") ||
+    rawType.includes("validation") ||
+    rawType.includes("backup")
+  );
+};
+
+const getNotificationVisuals = (notif: any) => {
+  const rawType = String(notif?.type || "").trim().toLowerCase();
+
+  if (
+    rawType.includes("account") ||
+    rawType.includes("account_request") ||
+    rawType.includes("request_account")
+  ) {
+    return {
+      icon: <UserPlus size={22} />,
+      iconClass: styles.iconAccount,
+      title: "Account Request",
+      description:
+        notif.description ||
+        `${notif.userName} has submitted a request to create an account.`,
+      tag: "Account",
+    };
   }
 
-  if (notif?.__isBackupRequest || notif?.__source === "backup_requests") {
-    return { label: "Backup Request", className: "typeBackup" };
+  if (
+    rawType.includes("validation_confirmed") ||
+    rawType.includes("confirmed_validation")
+  ) {
+    return {
+      icon: <BadgeCheck size={22} />,
+      iconClass: styles.iconConfirmed,
+      title: "Validation Confirmed",
+      description:
+        notif.description ||
+        `${notif.adminName} confirmed the fire validation from ${notif.teamName}.`,
+      tag: "Confirmed",
+    };
   }
 
-  return { label: "Fire Alert", className: "typeFire" };
+  if (rawType.includes("fire_validation") || rawType.includes("validation")) {
+    return {
+      icon: <ShieldCheck size={22} />,
+      iconClass: styles.iconValidation,
+      title: "Fire Validation",
+      description:
+        notif.description ||
+        `${notif.userName} of ${notif.teamName} validated a fire incident.`,
+      tag: "Validation",
+    };
+  }
+
+  if (
+    rawType.includes("assign_team") ||
+    rawType.includes("team_assignment") ||
+    rawType.includes("assign responder")
+  ) {
+    return {
+      icon: <Users size={22} />,
+      iconClass: styles.iconTeam,
+      title: "Assign Responder to a Team",
+      description:
+        notif.description ||
+        `${notif.userName} is currently not assigned to any responder team.`,
+      tag: "Team",
+    };
+  }
+
+  if (
+    rawType.includes("fire_alert") ||
+    rawType.includes("fire") ||
+    rawType.includes("backup") ||
+    notif.__source === "alerts" ||
+    notif.__source === "backup_requests"
+  ) {
+    return {
+      icon: <Flame size={22} />,
+      iconClass: styles.iconFire,
+      title:
+        notif.__source === "backup_requests" ? "Backup Request" : "Fire Alert",
+      description:
+        notif.description ||
+        `Fire confirmed by user at ${notif.location || "the reported location"}.`,
+      tag: notif.__source === "backup_requests" ? "Backup" : "Fire",
+    };
+  }
+
+  return {
+    icon: <Bell size={22} />,
+    iconClass: styles.iconSystem,
+    title: "System Notification",
+    description:
+      notif.description ||
+      "There is a new system activity that requires attention.",
+    tag: "System",
+  };
 };
 
 const NotificationPage: React.FC = () => {
@@ -129,19 +224,15 @@ const NotificationPage: React.FC = () => {
   const [selectedNotif, setSelectedNotif] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [filter, setFilter] = useState("all");
-  const [bulkActionTarget, setBulkActionTarget] = useState<"all" | "filtered" | null>(null);
-
-  /* 🔊 SOUND STATES */
-
+  const [bulkActionTarget, setBulkActionTarget] = useState<
+    "selected_read" | "selected_unread" | "all" | null
+  >(null);
   const [currentUid, setCurrentUid] = useState("");
-
-  /* PAGINATION */
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isSelectMode, setIsSelectMode] = useState(false);
   const itemsPerPage = 5;
 
-  
-
-  /* REALTIME ALERT LISTENER */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setCurrentUid(user?.uid || "");
@@ -150,43 +241,119 @@ const NotificationPage: React.FC = () => {
     return () => unsub();
   }, []);
 
+  const normalizeBackupRequestWithAlert = async (id: string, data: any) => {
+    let alertLocation =
+      data?.location || data?.alertLocation || "Unknown Location";
+    let alertAddress = data?.userAddress || data?.address || "N/A";
+    let alertDescription =
+      data?.description || data?.reason || data?.details || "";
+
+    if (data?.alertId) {
+      try {
+        const alertRef = doc(db, "alerts", data.alertId);
+        const alertSnap = await getDoc(alertRef);
+
+        if (alertSnap.exists()) {
+          const alertData = alertSnap.data();
+
+          alertLocation =
+            alertData?.location ||
+            alertData?.alertLocation ||
+            alertData?.userAddress ||
+            alertData?.address ||
+            data?.location ||
+            "Unknown Location";
+
+          alertAddress =
+            alertData?.userAddress ||
+            alertData?.address ||
+            alertData?.location ||
+            data?.userAddress ||
+            "N/A";
+
+          alertDescription =
+            data?.reason ||
+            alertData?.description ||
+            alertData?.details ||
+            alertData?.message ||
+            "";
+        }
+      } catch (error) {
+        console.error(
+          "Failed to fetch linked alert for backup request:",
+          error
+        );
+      }
+    }
+
+    return {
+      ...normalizeNotification(id, data, "backup_requests"),
+      location: alertLocation,
+      userAddress: alertAddress,
+      description: alertDescription,
+    };
+  };
+
   useEffect(() => {
     let latestAlerts: any[] = [];
     let latestBackupRequests: any[] = [];
     let latestSystemNotifs: any[] = [];
+    let isMounted = true;
+    let backupRequestRun = 0;
 
     const syncNotifications = () => {
-      const merged = [...latestAlerts, ...latestBackupRequests, ...latestSystemNotifs].sort(
+      if (!isMounted) return;
+
+      const merged = [
+        ...latestAlerts,
+        ...latestBackupRequests,
+        ...latestSystemNotifs,
+      ].sort(
         (a, b) => timestampToMillis(b.timestamp) - timestampToMillis(a.timestamp)
       );
+
       setNotifications(merged);
     };
 
     const unsubscribeAlerts = onSnapshot(
       collection(db, "alerts"),
       (snapshot) => {
-        latestAlerts = snapshot.docs.map((d) => normalizeNotification(d.id, d.data(), "alerts"));
+        if (!isMounted) return;
+
+        latestAlerts = snapshot.docs.map((d) =>
+          normalizeNotification(d.id, d.data(), "alerts")
+        );
         syncNotifications();
       },
       (err) => console.error("alerts onSnapshot error:", err)
     );
 
     const unsubscribeBackupRequests = onSnapshot(
-  collection(db, "backup_requests"),
-  async (snapshot) => {
-    latestBackupRequests = await Promise.all(
-      snapshot.docs.map((d) =>
-        normalizeBackupRequestWithAlert(d.id, d.data())
-      )
+      collection(db, "backup_requests"),
+      async (snapshot) => {
+        if (!isMounted) return;
+
+        const runId = ++backupRequestRun;
+
+        const normalized = await Promise.all(
+          snapshot.docs.map((d) =>
+            normalizeBackupRequestWithAlert(d.id, d.data())
+          )
+        );
+
+        if (!isMounted || runId !== backupRequestRun) return;
+
+        latestBackupRequests = normalized;
+        syncNotifications();
+      },
+      (err) => console.error("backup_requests onSnapshot error:", err)
     );
-    syncNotifications();
-  },
-  (err) => console.error("backup_requests onSnapshot error:", err)
-);
 
     const unsubscribeSystemNotifs = onSnapshot(
       collection(db, "notifications"),
       (snapshot) => {
+        if (!isMounted) return;
+
         latestSystemNotifs = snapshot.docs.map((d) =>
           normalizeNotification(d.id, d.data(), "notifications")
         );
@@ -196,69 +363,22 @@ const NotificationPage: React.FC = () => {
     );
 
     return () => {
+      isMounted = false;
       unsubscribeAlerts();
       unsubscribeBackupRequests();
       unsubscribeSystemNotifs();
     };
   }, []);
 
-
-  const normalizeBackupRequestWithAlert = async (id: string, data: any) => {
-  let alertLocation = data?.location || data?.alertLocation || "Unknown Location";
-  let alertAddress = data?.userAddress || data?.address || "N/A";
-  let alertDescription = data?.description || data?.reason || data?.details || "";
-
-  if (data?.alertId) {
-    try {
-      const alertRef = doc(db, "alerts", data.alertId);
-      const alertSnap = await getDoc(alertRef);
-
-      if (alertSnap.exists()) {
-        const alertData = alertSnap.data();
-
-        alertLocation =
-          alertData?.location ||
-          alertData?.alertLocation ||
-          alertData?.userAddress ||
-          alertData?.address ||
-          data?.location ||
-          "Unknown Location";
-
-        alertAddress =
-          alertData?.userAddress ||
-          alertData?.address ||
-          alertData?.location ||
-          data?.userAddress ||
-          "N/A";
-
-        alertDescription =
-          data?.reason ||
-          alertData?.description ||
-          alertData?.details ||
-          alertData?.message ||
-          "";
-      }
-    } catch (error) {
-      console.error("Failed to fetch linked alert for backup request:", error);
-    }
-  }
-
-  return {
-    ...normalizeNotification(id, data, "backup_requests"),
-    location: alertLocation,
-    userAddress: alertAddress,
-    description: alertDescription,
-  };
-};
- 
-
-  /* RESET PAGE WHEN FILTER CHANGES */
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedIds([]);
+    setIsSelectMode(false);
   }, [filter]);
 
-  /* OPEN MODAL */
   const handleOpenModal = async (notif: any) => {
+    if (isSelectMode) return;
+
     setSelectedNotif(notif);
     setShowModal(true);
 
@@ -275,7 +395,6 @@ const NotificationPage: React.FC = () => {
 
   const handleCloseModal = () => setShowModal(false);
 
-  /* FILTER LOGIC */
   const filteredNotifications = notifications.filter((n) => {
     const isRead = currentUid ? isReadByUser(n, currentUid) : false;
 
@@ -289,17 +408,114 @@ const NotificationPage: React.FC = () => {
     ? notifications.filter((n) => !isReadByUser(n, currentUid))
     : [];
 
-  const unreadFilteredNotifications = currentUid
-    ? filteredNotifications.filter((n) => !isReadByUser(n, currentUid))
-    : [];
+  const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedNotifications = filteredNotifications.slice(
+    startIndex,
+    endIndex
+  );
 
-  const markNotificationsAsRead = async (
-    items: any[],
-    target: "all" | "filtered"
-  ) => {
+  const visibleSelectableNotifications = paginatedNotifications;
+
+  const allVisibleSelected =
+    visibleSelectableNotifications.length > 0 &&
+    visibleSelectableNotifications.every((n) => selectedIds.includes(n.id));
+
+  const toggleSelectNotification = (notifId: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(notifId)
+        ? prev.filter((id) => id !== notifId)
+        : [...prev, notifId]
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    if (allVisibleSelected) {
+      setSelectedIds((prev) =>
+        prev.filter(
+          (id) =>
+            !visibleSelectableNotifications.some((notif) => notif.id === id)
+        )
+      );
+      return;
+    }
+
+    const visibleIds = visibleSelectableNotifications.map((notif) => notif.id);
+    setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+  };
+
+  const handleEnableSelectMode = () => {
+    setIsSelectMode(true);
+  };
+
+  const handleCancelSelectMode = () => {
+    setIsSelectMode(false);
+    setSelectedIds([]);
+  };
+
+  const selectedVisibleCount = selectedIds.length;
+
+  const selectedNotifications = useMemo(
+    () => notifications.filter((notif) => selectedIds.includes(notif.id)),
+    [notifications, selectedIds]
+  );
+
+  const markNotificationsAsRead = async (items: any[]) => {
     if (!currentUid || items.length === 0) return;
 
-    setBulkActionTarget(target);
+    setBulkActionTarget("selected_read");
+    try {
+      await Promise.all(
+        items.map((notif) =>
+          updateDoc(doc(db, notif.__source || "alerts", notif.id), {
+            readBy: arrayUnion(currentUid),
+          })
+        )
+      );
+
+      setSelectedIds([]);
+      setIsSelectMode(false);
+    } catch (error) {
+      console.error("Failed to mark notifications as read:", error);
+    } finally {
+      setBulkActionTarget(null);
+    }
+  };
+
+  const markNotificationsAsUnread = async (items: any[]) => {
+    if (!currentUid || items.length === 0) return;
+
+    setBulkActionTarget("selected_unread");
+    try {
+      await Promise.all(
+        items.map(async (notif) => {
+          const currentReadBy = Array.isArray(notif?.readBy)
+            ? notif.readBy
+            : [];
+          const updatedReadBy = currentReadBy.filter(
+            (id: string) => id !== currentUid
+          );
+
+          await updateDoc(doc(db, notif.__source || "alerts", notif.id), {
+            readBy: updatedReadBy,
+          });
+        })
+      );
+
+      setSelectedIds([]);
+      setIsSelectMode(false);
+    } catch (error) {
+      console.error("Failed to mark notifications as unread:", error);
+    } finally {
+      setBulkActionTarget(null);
+    }
+  };
+
+  const markAllAsRead = async (items: any[]) => {
+    if (!currentUid || items.length === 0) return;
+
+    setBulkActionTarget("all");
     try {
       await Promise.all(
         items.map((notif) =>
@@ -315,31 +531,17 @@ const NotificationPage: React.FC = () => {
     }
   };
 
-  /* PAGINATION LOGIC */
-  const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage);
-
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-
-  const paginatedNotifications = filteredNotifications.slice(
-    startIndex,
-    endIndex
-  );
-
   return (
     <div>
       <AdminHeader />
 
-      {/* Bell */}
-      <div style={{ position: "absolute", top: 20, right: 30, zIndex: 50 }}>
-        <AlertBellButton />
-      </div>
+      <AlertBellButton />
+      <AdminTutorialChat />
 
       <AlertDispatchModal />
 
       <div className={styles.container}>
         <div className={styles.contentSection}>
-          {/* HEADER */}
           <div className={styles.headerRow}>
             <h2 className={styles.pageTitle}>Notifications</h2>
 
@@ -359,119 +561,189 @@ const NotificationPage: React.FC = () => {
           </div>
 
           <div className={styles.bulkActionsRow}>
-            <button
-              className={styles.bulkActionBtn}
-              onClick={() =>
-                markNotificationsAsRead(unreadFilteredNotifications, "filtered")
-              }
-              disabled={
-                !currentUid ||
-                unreadFilteredNotifications.length === 0 ||
-                bulkActionTarget !== null
-              }
-            >
-              {bulkActionTarget === "filtered"
-                ? "Marking visible..."
-                : `Mark Filtered as Read (${unreadFilteredNotifications.length})`}
-            </button>
+            {!isSelectMode ? (
+              <>
+                <button
+                  className={styles.bulkActionBtn}
+                  onClick={handleEnableSelectMode}
+                  disabled={!currentUid || paginatedNotifications.length === 0}
+                >
+                  Select
+                </button>
 
-            <button
-              className={`${styles.bulkActionBtn} ${styles.bulkActionBtnSecondary}`}
-              onClick={() => markNotificationsAsRead(unreadAllNotifications, "all")}
-              disabled={
-                !currentUid ||
-                unreadAllNotifications.length === 0 ||
-                bulkActionTarget !== null
-              }
-            >
-              {bulkActionTarget === "all"
-                ? "Marking all..."
-                : `Mark All as Read (${unreadAllNotifications.length})`}
-            </button>
+                <button
+                  className={`${styles.bulkActionBtn} ${styles.bulkActionBtnSecondary}`}
+                  onClick={() => markAllAsRead(unreadAllNotifications)}
+                  disabled={
+                    !currentUid ||
+                    unreadAllNotifications.length === 0 ||
+                    bulkActionTarget !== null
+                  }
+                >
+                  {bulkActionTarget === "all"
+                    ? "Marking all..."
+                    : `Mark All as Read (${unreadAllNotifications.length})`}
+                </button>
+              </>
+            ) : (
+              <>
+                <label className={styles.selectAllWrap}>
+                  <input
+                    type="checkbox"
+                    className={styles.bulkCheckbox}
+                    checked={allVisibleSelected}
+                    onChange={toggleSelectAllVisible}
+                    disabled={
+                      !currentUid || visibleSelectableNotifications.length === 0
+                    }
+                  />
+                  <span>
+                    Select All Visible
+                    {selectedVisibleCount > 0
+                      ? ` (${selectedVisibleCount} selected)`
+                      : ""}
+                  </span>
+                </label>
+
+                {selectedVisibleCount > 0 && (
+                  <>
+                    <button
+                      className={styles.bulkActionBtn}
+                      onClick={() =>
+                        markNotificationsAsRead(selectedNotifications)
+                      }
+                      disabled={!currentUid || bulkActionTarget !== null}
+                    >
+                      {bulkActionTarget === "selected_read"
+                        ? "Updating..."
+                        : "Mark as Read"}
+                    </button>
+
+                    <button
+                      className={`${styles.bulkActionBtn} ${styles.bulkActionBtnSecondary}`}
+                      onClick={() =>
+                        markNotificationsAsUnread(selectedNotifications)
+                      }
+                      disabled={!currentUid || bulkActionTarget !== null}
+                    >
+                      {bulkActionTarget === "selected_unread"
+                        ? "Updating..."
+                        : "Mark as Unread"}
+                    </button>
+                  </>
+                )}
+
+                <button
+                  className={`${styles.bulkActionBtn} ${styles.bulkActionBtnSecondary}`}
+                  onClick={handleCancelSelectMode}
+                  disabled={bulkActionTarget !== null}
+                >
+                  Cancel
+                </button>
+              </>
+            )}
           </div>
 
           <hr className={styles.separator} />
 
-          {/* NOTIFICATION LIST */}
           <div className={styles.notificationList}>
             {filteredNotifications.length === 0 ? (
               <p className={styles.noNotif}>No notifications found.</p>
             ) : (
-              paginatedNotifications.map((notif) => (
-                (() => {
-                  const notifTag = getNotificationTag(notif);
-                  return (
-                <div
-                  key={notif.id}
-                  onClick={() => handleOpenModal(notif)}
-                  className={`${styles.notificationCard} ${
-                    currentUid && isReadByUser(notif, currentUid) ? styles.read : styles.unread
-                  }`}
-                >
-                  <div className={styles.notifInfo}>
-                    <div className={styles.notifTitleRow}>
-                      <h4>
-                        {notif.__isBackupRequest ? "Backup Request" : notif.type}
-                        {!(currentUid && isReadByUser(notif, currentUid)) && (
-                          <span className={styles.unreadDot}></span>
-                        )}
-                      </h4>
+              paginatedNotifications.map((notif) => {
+                const visual = getNotificationVisuals(notif);
+                const isRead = currentUid
+                  ? isReadByUser(notif, currentUid)
+                  : false;
+                const isFireRelated = isFireRelatedNotification(notif);
+                const isChecked = selectedIds.includes(notif.id);
 
-                      <span
-                        className={`${styles.notifTypeTag} ${styles[notifTag.className]}`}
-                      >
-                        {notifTag.label}
-                      </span>
-                    </div>
-
-                    <p>
-                      <strong>Location:</strong>{" "}
-                      {notif.location || "Unknown Location"}
-                    </p>
-
-                    <p>
-                      <strong>Reported by:</strong>{" "}
-                      {notif.userName || "Unknown User"}
-                    </p>
-
-                    <p>
-                      <strong>Status:</strong> {notif.status}
-                    </p>
-
-                    <p>
-                      <strong>Date:</strong>{" "}
-                      {notif.timestamp?.seconds
-                        ? new Date(
-                            notif.timestamp.seconds * 1000
-                          ).toLocaleString()
-                        : "Pending..."}
-                    </p>
-                  </div>
-
-                  <span
-                    className={`${styles.statusBadge} ${
-                      notif.status === "Pending" || notif.status === "Active" || notif.status === "Open"
-                        ? styles.statusPending
-                        : styles.statusResolved
+                return (
+                  <div
+                    key={notif.id}
+                    onClick={() => handleOpenModal(notif)}
+                    className={`${styles.notificationCard} ${
+                      isRead
+                        ? styles.read
+                        : isFireRelated
+                        ? styles.unreadFire
+                        : styles.unreadSystem
                     }`}
                   >
-                    {notif.status}
-                  </span>
-                </div>
-                  );
-                })()
-              ))
+                    {isSelectMode && (
+                      <div
+                        className={styles.checkboxArea}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          className={styles.notificationCheckbox}
+                          checked={isChecked}
+                          onChange={() => toggleSelectNotification(notif.id)}
+                          aria-label={`Select notification ${visual.title}`}
+                        />
+                      </div>
+                    )}
+
+                    <div className={styles.notificationMain}>
+                      <div
+                        className={`${styles.notifIconWrap} ${visual.iconClass}`}
+                      >
+                        {visual.icon}
+                      </div>
+
+                      <div className={styles.notifContent}>
+                        <div className={styles.notifTopRow}>
+                          <h4 className={styles.notifTitle}>
+                            {visual.title}
+                            {!isRead && (
+                              <span className={styles.unreadDot}></span>
+                            )}
+                          </h4>
+
+                          <span
+                            className={`${styles.statusBadge} ${
+                              normalizeStatus(notif.status) === "pending" ||
+                              normalizeStatus(notif.status) === "active" ||
+                              normalizeStatus(notif.status) === "open"
+                                ? isFireRelated
+                                  ? styles.statusPending
+                                  : styles.statusActive
+                                : styles.statusResolved
+                            }`}
+                          >
+                            {prettyStatus(notif.status)}
+                          </span>
+                        </div>
+
+                        <p className={styles.notifDescription}>
+                          {visual.description}
+                        </p>
+
+                        <div className={styles.notifMeta}>
+                          <span>{visual.tag}</span>
+                          <span>•</span>
+                          <span>
+                            {notif.timestamp?.seconds
+                              ? new Date(
+                                  notif.timestamp.seconds * 1000
+                                ).toLocaleString()
+                              : "Pending..."}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
 
-          {/* PAGINATION */}
           {filteredNotifications.length > 0 && (
             <div className={styles.pagination}>
               <button
                 className={styles.pageBtn}
-                onClick={() =>
-                  setCurrentPage((prev) => Math.max(prev - 1, 1))
-                }
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
               >
                 Prev
@@ -495,60 +767,141 @@ const NotificationPage: React.FC = () => {
         </div>
       </div>
 
-      {/* MODAL */}
       {showModal && selectedNotif && (
         <div className={styles.modalOverlay} onClick={handleCloseModal}>
           <div
             className={styles.modalContent}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3>{selectedNotif.__isBackupRequest ? "Backup Request Details" : "Fire Alert Details"}</h3>
+            {(() => {
+              const modalVisual = getNotificationVisuals(selectedNotif);
+              const rawType = String(selectedNotif?.type || "").toLowerCase();
+              const isFire = isFireRelatedNotification(selectedNotif);
 
-            <p>
-              <strong>Location:</strong> {selectedNotif.location || "N/A"}
-            </p>
+              return (
+                <>
+                  <div className={styles.modalHeader}>
+                    <div className={styles.modalHeaderIconBox}>
+                      <div
+                        className={`${styles.modalHeaderIcon} ${modalVisual.iconClass}`}
+                      >
+                        {modalVisual.icon}
+                      </div>
+                    </div>
 
-            <p>
-              <strong>Status:</strong> {selectedNotif.status || "N/A"}
-            </p>
+                    <div className={styles.modalHeaderTitleBox}>
+                      <h3 className={styles.modalTitle}>{modalVisual.title}</h3>
+                      <p className={styles.modalSubtitle}>
+                        {modalVisual.tag} Notification
+                      </p>
+                    </div>
+                  </div>
 
-            <p>
-              <strong>Date:</strong>{" "}
-              {selectedNotif.timestamp?.seconds
-                ? new Date(
-                    selectedNotif.timestamp.seconds * 1000
-                  ).toLocaleString()
-                : "Pending..."}
-            </p>
+                  <div className={styles.modalDivider}></div>
 
-            <hr />
+                  <div className={styles.modalDetails}>
+                    <h4 className={styles.modalSectionTitle}>Details</h4>
 
-            <h4><strong>User Information</strong></h4>
+                    <div className={styles.modalInfoGrid}>
+                      <div className={styles.modalInfoRow}>
+                        <span className={styles.modalLabel}>Status</span>
+                        <span
+                          className={`${styles.statusBadge} ${
+                            normalizeStatus(selectedNotif.status) === "pending" ||
+                            normalizeStatus(selectedNotif.status) === "active" ||
+                            normalizeStatus(selectedNotif.status) === "open"
+                              ? isFire
+                                ? styles.statusPending
+                                : styles.statusActive
+                              : styles.statusResolved
+                          }`}
+                        >
+                          {prettyStatus(selectedNotif.status || "Pending")}
+                        </span>
+                      </div>
 
-            <p>
-              <strong>Name:</strong> {selectedNotif.userName || "N/A"}
-            </p>
+                      {selectedNotif.timestamp && (
+                        <div className={styles.modalInfoRow}>
+                          <span className={styles.modalLabel}>Date</span>
+                          <span className={styles.modalValue}>
+                            {selectedNotif.timestamp?.seconds
+                              ? new Date(
+                                  selectedNotif.timestamp.seconds * 1000
+                                ).toLocaleString()
+                              : "Pending..."}
+                          </span>
+                        </div>
+                      )}
 
-            <p>
-              <strong>Address:</strong> {selectedNotif.userAddress || "N/A"}
-            </p>
+                      {isFire && (
+                        <div className={styles.modalInfoRow}>
+                          <span className={styles.modalLabel}>Location</span>
+                          <span className={styles.modalValue}>
+                            {selectedNotif.location || "N/A"}
+                          </span>
+                        </div>
+                      )}
 
-            <p>
-              <strong>Contact:</strong> {selectedNotif.userContact || "N/A"}
-            </p>
+                      {rawType.includes("validation") && (
+                        <>
+                          <div className={styles.modalInfoRow}>
+                            <span className={styles.modalLabel}>Responder</span>
+                            <span className={styles.modalValue}>
+                              {selectedNotif.userName || "N/A"}
+                            </span>
+                          </div>
 
-            <p>
-              <strong>Email:</strong> {selectedNotif.userEmail || "N/A"}
-            </p>
+                          <div className={styles.modalInfoRow}>
+                            <span className={styles.modalLabel}>Team</span>
+                            <span className={styles.modalValue}>
+                              {selectedNotif.teamName || "N/A"}
+                            </span>
+                          </div>
+                        </>
+                      )}
 
-            <p className={styles.desc}>
-              {selectedNotif.description ||
-                "Fire detected in this area."}
-            </p>
+                      {rawType.includes("confirmed") && (
+                        <div className={styles.modalInfoRow}>
+                          <span className={styles.modalLabel}>Admin</span>
+                          <span className={styles.modalValue}>
+                            {selectedNotif.adminName || "Admin"}
+                          </span>
+                        </div>
+                      )}
 
-            <button className={styles.closeBtn} onClick={handleCloseModal}>
-              <span>Close</span>
-            </button>
+                      {rawType.includes("account") && (
+                        <>
+                          <div className={styles.modalInfoRow}>
+                            <span className={styles.modalLabel}>Name</span>
+                            <span className={styles.modalValue}>
+                              {selectedNotif.userName || "N/A"}
+                            </span>
+                          </div>
+
+                          <div className={styles.modalInfoRow}>
+                            <span className={styles.modalLabel}>Email</span>
+                            <span className={styles.modalValue}>
+                              {selectedNotif.userEmail || "N/A"}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {modalVisual.description && (
+                      <div className={styles.modalDescriptionBox}>
+                        <span className={styles.modalLabel}>Description</span>
+                        <p className={styles.desc}>{modalVisual.description}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <button className={styles.closeBtn} onClick={handleCloseModal}>
+                    <span>Close</span>
+                  </button>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

@@ -33,24 +33,82 @@
   border-top: 1px solid #ddd;
 }
 
+.bellContainer {
+  position: absolute;
+  top: 32px;
+  right: 30px;
+  z-index: 50;
+}
+
+/* INFO BOX */
+.infoBox {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: #e6f0ff;
+  border: 1px solid #bcd4ff;
+  border-radius: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.infoIcon {
+  font-size: 16px;
+  color: #2563eb;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.infoText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #1e3a8a;
+}
+
 /* BUTTONS */
 .addBtn,
 .assignBtn,
-.saveBtn,
 .closeBtn,
-.deleteBtn,
+.okayBtn,
 .editBtn,
-.removeBtn,
-.mapSearchBtn,
-.okayBtn {
+.deleteBtn {
   border-radius: 10px;
   padding: 10px 14px;
   cursor: pointer;
   font-weight: 600;
   position: relative;
   overflow: hidden;
-  transition: color 0.3s ease;
+  transition: color 0.3s ease, box-shadow 0.25s ease;
   z-index: 1;
+  background: #ffffff;
+}
+
+.saveBtn,
+.removeBtn,
+.mapSearchBtn {
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-weight: 600;
+  position: relative;
+  overflow: hidden;
+  transition: color 0.3s ease, box-shadow 0.25s ease;
+  z-index: 1;
+}
+
+.addBtn,
+.assignBtn,
+.closeBtn,
+.okayBtn,
+.editBtn {
+  color: #8b0000;
+  border: 2px solid #8b0000;
+}
+
+.deleteBtn {
+  color: #dc2626;
+  border: 2px solid #dc2626;
 }
 
 .addBtn::before,
@@ -68,9 +126,32 @@
   left: -100%;
   width: 100%;
   height: 100%;
-  background: white;
   transition: left 0.35s ease;
   z-index: 0;
+}
+
+.addBtn::before,
+.assignBtn::before,
+.closeBtn::before,
+.okayBtn::before,
+.editBtn::before {
+  background: #8b0000;
+}
+
+.deleteBtn::before {
+  background: #dc2626;
+}
+
+.saveBtn::before {
+  background: #7a0000;
+}
+
+.removeBtn::before {
+  background: white;
+}
+
+.mapSearchBtn::before {
+  background: white;
 }
 
 .addBtn span,
@@ -86,66 +167,47 @@
   z-index: 1;
 }
 
-.addBtn,
-.assignBtn,
+.addBtn:hover::before,
+.assignBtn:hover::before,
+.saveBtn:hover::before,
+.closeBtn:hover::before,
+.deleteBtn:hover::before,
+.editBtn:hover::before,
+.removeBtn:hover::before,
+.mapSearchBtn:hover::before,
+.okayBtn:hover::before {
+  left: 0;
+}
+
+.addBtn:hover,
+.assignBtn:hover,
+.closeBtn:hover,
+.okayBtn:hover,
+.saveBtn:hover,
+.deleteBtn:hover,
+.editBtn:hover,
+.removeBtn:hover,
+.mapSearchBtn:hover {
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+}
+
+.addBtn:hover,
+.assignBtn:hover,
+.closeBtn:hover,
+.okayBtn:hover,
+.editBtn:hover,
+.deleteBtn:hover {
+  color: #ffffff;
+}
+
 .saveBtn {
   background: #8b0000;
   color: #fff;
   border: 2px solid #8b0000;
 }
 
-.addBtn:hover::before,
-.assignBtn:hover::before,
-.saveBtn:hover::before {
-  left: 0;
-}
-
-.addBtn:hover,
-.assignBtn:hover,
 .saveBtn:hover {
-  color: #8b0000;
-}
-
-.closeBtn {
-  background: #8b0000;
-  color: #fff;
-  border: 2px solid #8b0000;
-}
-
-.closeBtn:hover::before {
-  left: 0;
-}
-
-.closeBtn:hover {
-  color: #8b0000;
-}
-
-.deleteBtn {
-  background: #dc2626;
-  color: #fff;
-  border: 2px solid #dc2626;
-}
-
-.deleteBtn:hover::before {
-  left: 0;
-}
-
-.deleteBtn:hover {
-  color: #dc2626;
-}
-
-.editBtn {
-  background: #2563eb;
-  color: #fff;
-  border: 2px solid #2563eb;
-}
-
-.editBtn:hover::before {
-  left: 0;
-}
-
-.editBtn:hover {
-  color: #2563eb;
+  color: #ffffff;
 }
 
 .removeBtn {
@@ -153,10 +215,6 @@
   color: #fff;
   border: 2px solid #f97316;
   padding: 8px 12px;
-}
-
-.removeBtn:hover::before {
-  left: 0;
 }
 
 .removeBtn:hover {
@@ -167,10 +225,6 @@
   background: #2563eb;
   color: #fff;
   border: 2px solid #2563eb;
-}
-
-.mapSearchBtn:hover::before {
-  left: 0;
 }
 
 .mapSearchBtn:hover {
@@ -270,10 +324,12 @@
 .dataTable {
   width: 100%;
   border-collapse: collapse;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .dataTable th {
-  background: #8b0000;
+  background: #800000;
   color: #fff;
   padding: 10px;
   text-align: left;
@@ -378,20 +434,9 @@
 }
 
 .okayBtn {
-  background: #a30000;
-  color: white;
-  border: 2px solid #a30000;
   padding: 12px 28px;
   border-radius: 12px;
   min-width: 180px;
-}
-
-.okayBtn:hover::before {
-  left: 0;
-}
-
-.okayBtn:hover {
-  color: #a30000;
 }
 
 /* OPTIONAL MESSAGE TEXT */
@@ -460,6 +505,11 @@
 
   .contentSection {
     padding: 14px;
+  }
+
+  .bellContainer {
+    top: 22px;
+    right: 16px;
   }
 
   .headerRow {

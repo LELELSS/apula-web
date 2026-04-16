@@ -13,6 +13,7 @@ import {
   FaUserCheck,
   FaUserClock,
   FaCheckCircle,
+  FaInfoCircle,
 } from "react-icons/fa";
 
 import { db } from "@/lib/firebase";
@@ -20,6 +21,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
+import AdminTutorialChat from "@/components/Chatbot/AdminTutorialChat";
 
 import {
   LineChart,
@@ -84,18 +86,18 @@ const AdminDashboard = () => {
 
   /* ================= ACTIVE FIRE ALERTS ================= */
   useEffect(() => {
-  const q = query(
-    collection(db, "alerts"),
-    where("status", "not-in", ["Resolved", "Confirmed"])
-  );
+    const q = query(
+      collection(db, "alerts"),
+      where("status", "not-in", ["Resolved", "Confirmed"]),
+    );
 
-  const unsub = onSnapshot(q, (snap) => {
-    setActiveAlertCount(snap.size);
-    setDataLoadCount((prev) => prev + 1);
-  });
+    const unsub = onSnapshot(q, (snap) => {
+      setActiveAlertCount(snap.size);
+      setDataLoadCount((prev) => prev + 1);
+    });
 
-  return () => unsub();
-}, []);
+    return () => unsub();
+  }, []);
   /* ================= RESPONDERS ================= */
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "users"), (snap) => {
@@ -113,7 +115,7 @@ const AdminDashboard = () => {
 
       setAvailableResponders(available);
       setDispatchedResponders(dispatched);
-      setDataLoadCount(prev => prev + 1);
+      setDataLoadCount((prev) => prev + 1);
     });
 
     return () => unsub();
@@ -130,7 +132,7 @@ const AdminDashboard = () => {
       });
 
       setAvailableTeams(teams);
-      setDataLoadCount(prev => prev + 1);
+      setDataLoadCount((prev) => prev + 1);
     });
 
     return () => unsub();
@@ -147,7 +149,7 @@ const AdminDashboard = () => {
       });
 
       setAvailableTrucks(trucks);
-      setDataLoadCount(prev => prev + 1);
+      setDataLoadCount((prev) => prev + 1);
     });
 
     return () => unsub();
@@ -177,14 +179,14 @@ const AdminDashboard = () => {
 
       setAlertsDates(parsedDates);
 
-      const years = Array.from(new Set(parsedDates.map((d) => d.getFullYear()))).sort(
-        (a, b) => b - a
-      );
+      const years = Array.from(
+        new Set(parsedDates.map((d) => d.getFullYear())),
+      ).sort((a, b) => b - a);
       setAvailableYears(years);
       if (years.length > 0 && !years.includes(selectedYear)) {
         setSelectedYear(years[0]);
       }
-      setDataLoadCount(prev => prev + 1);
+      setDataLoadCount((prev) => prev + 1);
     });
 
     return () => unsub();
@@ -194,13 +196,21 @@ const AdminDashboard = () => {
   useEffect(() => {
     const resolvedQuery = query(
       collection(db, "alerts"),
-      where("status", "==", "Resolved")
+      where("status", "==", "Resolved"),
     );
 
     const unsub = onSnapshot(resolvedQuery, (snapshot) => {
       const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      const startOfDay = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+      );
+      const endOfDay = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1,
+      );
 
       let count = 0;
 
@@ -226,7 +236,7 @@ const AdminDashboard = () => {
       });
 
       setResolvedTodayCount(count);
-      setDataLoadCount(prev => prev + 1);
+      setDataLoadCount((prev) => prev + 1);
     });
 
     return () => unsub();
@@ -263,8 +273,9 @@ const AdminDashboard = () => {
       alertsDates.forEach((d) => {
         if (d < weekStart || d > weekEnd) return;
         const dayIndex = Math.floor(
-          (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - weekStart.getTime()) /
-            (1000 * 60 * 60 * 24)
+          (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() -
+            weekStart.getTime()) /
+            (1000 * 60 * 60 * 24),
         );
 
         if (dayIndex >= 0 && dayIndex < 7) {
@@ -290,7 +301,7 @@ const AdminDashboard = () => {
           label: monthNames[index],
           alerts: count,
           fullDate: `${monthNames[index]} ${selectedYear}`,
-        }))
+        })),
       );
       return;
     }
@@ -316,7 +327,7 @@ const AdminDashboard = () => {
       yearsForChart.map((year) => ({
         label: String(year),
         alerts: yearlyBuckets[year] ?? 0,
-      }))
+      })),
     );
   }, [alertsDates, selectedPeriod, selectedYear, availableYears]);
 
@@ -339,9 +350,7 @@ const AdminDashboard = () => {
 
     const csvContent = csvRows
       .map((row) =>
-        row
-          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
-          .join(",")
+        row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","),
       )
       .join("\n");
 
@@ -354,6 +363,30 @@ const AdminDashboard = () => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const getLineChartDescription = () => {
+    if (selectedPeriod === "week") {
+      return "Shows the daily trend of fire incidents recorded within the current week. This helps the admin monitor which days had increasing or decreasing incident activity.";
+    }
+
+    if (selectedPeriod === "month") {
+      return "Shows the monthly trend of fire incidents recorded throughout the selected year. This helps the admin identify which months had higher or lower incident activity.";
+    }
+
+    return "Shows the yearly trend of fire incidents recorded across all available years. This helps the admin compare overall incident patterns from one year to another.";
+  };
+
+  const getBarChartDescription = () => {
+    if (selectedPeriod === "week") {
+      return "Displays the total number of fire incidents recorded for each day of the current week. Taller bars indicate days with more incidents.";
+    }
+
+    if (selectedPeriod === "month") {
+      return "Displays the total number of fire incidents recorded for each month of the selected year. Taller bars indicate months with more incidents.";
+    }
+
+    return "Displays the total number of fire incidents recorded for each available year. Taller bars indicate years with more incidents.";
   };
 
   return (
@@ -384,9 +417,8 @@ const AdminDashboard = () => {
         <>
           <AdminHeader />
 
-          <div style={{ position: "absolute", top: 20, right: 30, zIndex: 50 }}>
-            <AlertBellButton />
-          </div>
+          <AlertBellButton />
+          <AdminTutorialChat />
 
           <AlertDispatchModal />
 
@@ -402,7 +434,9 @@ const AdminDashboard = () => {
                     <FaFire className={styles.cardIcon} />
                     <p className={styles.bigNumber}>{activeAlertCount}</p>
                   </div>
-                  <span className={styles.cardLabel}>Active Fire Incidents</span>
+                  <span className={styles.cardLabel}>
+                    Active Fire Incidents
+                  </span>
                 </div>
 
                 <div className={styles.cardSuccess}>
@@ -437,104 +471,137 @@ const AdminDashboard = () => {
                     <FaUserClock className={styles.cardIcon} />
                     <p className={styles.bigNumber}>{dispatchedResponders}</p>
                   </div>
-                  <span className={styles.cardLabel}>Dispatched Responders</span>
+                  <span className={styles.cardLabel}>
+                    Dispatched Responders
+                  </span>
                 </div>
 
-            <div className={styles.cardSuccess}>
-              <div className={styles.cardTop}>
-                <FaCheckCircle className={styles.cardIcon} />
-                <p className={styles.bigNumber}>{resolvedTodayCount}</p>
+                <div className={styles.cardSuccess}>
+                  <div className={styles.cardTop}>
+                    <FaCheckCircle className={styles.cardIcon} />
+                    <p className={styles.bigNumber}>{resolvedTodayCount}</p>
+                  </div>
+                  <span className={styles.cardLabel}>
+                    Confirmed Fire Incidents (Today)
+                  </span>
+                </div>
               </div>
-              <span className={styles.cardLabel}>Confirmed Fire Incidents (Today)</span>
-            </div>
-          </div>
 
-          <div className={styles.analyticsSection}>
-            <div className={styles.analyticsHeader}>
-              <h2 className={styles.analyticsTitle}>
-                Fire Incidents Overview
-                {selectedPeriod === "year"
-                  ? ` (${periodLabelMap[selectedPeriod]})`
-                  : ` (${periodLabelMap[selectedPeriod]} ${selectedYear})`}
-              </h2>
+              <div className={styles.analyticsSection}>
+                <div className={styles.analyticsHeader}>
+                  <h2 className={styles.analyticsTitle}>
+                    Fire Incidents Overview
+                    {selectedPeriod === "year"
+                      ? ` (${periodLabelMap[selectedPeriod]})`
+                      : ` (${periodLabelMap[selectedPeriod]} ${selectedYear})`}
+                  </h2>
 
-              {selectedPeriod !== "year" && (
-                <select
-                  className={styles.yearSelect}
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                >
-                  {availableYears.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
+                  {selectedPeriod !== "year" && (
+                    <select
+                      className={styles.yearSelect}
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    >
+                      {availableYears.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div className={styles.periodSwitcher}>
+                  {(["week", "month", "year"] as Period[]).map((period) => (
+                    <button
+                      key={period}
+                      className={`${styles.periodBtn} ${
+                        selectedPeriod === period ? styles.periodBtnActive : ""
+                      }`}
+                      onClick={() => setSelectedPeriod(period)}
+                    >
+                      {period.charAt(0).toUpperCase() + period.slice(1)}
+                    </button>
                   ))}
-                </select>
-              )}
-            </div>
+                </div>
 
-            <div className={styles.periodSwitcher}>
-              {(["week", "month", "year"] as Period[]).map((period) => (
-                <button
-                  key={period}
-                  className={`${styles.periodBtn} ${
-                    selectedPeriod === period ? styles.periodBtnActive : ""
-                  }`}
-                  onClick={() => setSelectedPeriod(period)}
-                >
-                  {period.charAt(0).toUpperCase() + period.slice(1)}
-                </button>
-              ))}
-            </div>
+                <div className={styles.chartsGrid}>
+                  <div className={styles.chartContainer}>
+                    <h4 className={styles.chartTitle}>Line Trend</h4>
 
-            <div className={styles.chartsGrid}>
-              <div className={styles.chartContainer}>
-                <h4 className={styles.chartTitle}>Line Trend</h4>
-                <ResponsiveContainer width="100%" height={280}>
-                  <LineChart
-                    data={chartData}
-                    margin={{ top: 16, right: 18, left: 8, bottom: 12 }}
+                    <ResponsiveContainer width="100%" height={280}>
+                      <LineChart
+                        data={chartData}
+                        margin={{ top: 16, right: 18, left: 8, bottom: 12 }}
+                      >
+                        <CartesianGrid stroke="#eeeeee" strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="label"
+                          padding={{ left: 10, right: 10 }}
+                        />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip labelFormatter={tooltipLabelFormatter} />
+                        <Line
+                          type="monotone"
+                          dataKey="alerts"
+                          stroke="#a30000"
+                          strokeWidth={3}
+                          dot={{ r: 3 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+
+                    <div className={styles.chartInfoBox}>
+                      <FaInfoCircle className={styles.infoIcon} />
+                      <p className={styles.chartInfoText}>
+                        {getLineChartDescription()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className={styles.chartContainer}>
+                    <h4 className={styles.chartTitle}>Bar Trend</h4>
+
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart
+                        data={chartData}
+                        margin={{ top: 16, right: 18, left: 8, bottom: 12 }}
+                      >
+                        <CartesianGrid stroke="#eeeeee" strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="label"
+                          padding={{ left: 10, right: 10 }}
+                        />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip labelFormatter={tooltipLabelFormatter} />
+                        <Bar
+                          dataKey="alerts"
+                          fill="#2563eb"
+                          radius={[6, 6, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+
+                    <div className={styles.chartInfoBox}>
+                      <FaInfoCircle className={styles.infoIcon} />
+                      <p className={styles.chartInfoText}>
+                        {getBarChartDescription()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.analyticsActions}>
+                  <button
+                    className={styles.downloadBtn}
+                    onClick={downloadChartData}
                   >
-                    <CartesianGrid stroke="#eeeeee" strokeDasharray="3 3" />
-                    <XAxis dataKey="label" padding={{ left: 10, right: 10 }} />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip labelFormatter={tooltipLabelFormatter} />
-                    <Line
-                      type="monotone"
-                      dataKey="alerts"
-                      stroke="#a30000"
-                      strokeWidth={3}
-                      dot={{ r: 3 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                    Download Data
+                  </button>
+                </div>
               </div>
-
-              <div className={styles.chartContainer}>
-                <h4 className={styles.chartTitle}>Bar Trend</h4>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart
-                    data={chartData}
-                    margin={{ top: 16, right: 18, left: 8, bottom: 12 }}
-                  >
-                    <CartesianGrid stroke="#eeeeee" strokeDasharray="3 3" />
-                    <XAxis dataKey="label" padding={{ left: 10, right: 10 }} />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip labelFormatter={tooltipLabelFormatter} />
-                    <Bar dataKey="alerts" fill="#2563eb" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className={styles.analyticsActions}>
-              <button className={styles.downloadBtn} onClick={downloadChartData}>
-                Download Data
-              </button>
             </div>
           </div>
-        </div>
-      </div>
         </>
       )}
     </div>

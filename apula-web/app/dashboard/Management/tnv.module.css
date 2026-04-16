@@ -113,6 +113,35 @@
 }
 
 /* ============================= */
+/*         INFO BOX              */
+/* ============================= */
+
+.tableInfoBox {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  background: #e6f0ff;
+  border: 1px solid #bcd4ff;
+  border-radius: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.infoIcon {
+  font-size: 16px;
+  color: #2563eb;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.tableInfoText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #1e3a8a;
+}
+
+/* ============================= */
 /*         TABLE                 */
 /* ============================= */
 
@@ -120,10 +149,12 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 0.95rem;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .dataTable th {
-  background: #8b0000;
+  background: #800000;
   color: white;
   padding: 10px;
   text-align: left;
@@ -211,7 +242,7 @@
 }
 
 .editBtn:hover {
-  color: #ffffff; /* text turns white */
+  color: #ffffff;
 }
 
 .deleteBtn {
@@ -350,8 +381,11 @@
   font-weight: 600;
   min-width: 130px;
   z-index: 1;
-  transition: color 0.25s ease, border-color 0.25s ease,
-    box-shadow 0.25s ease, background-color 0.25s ease;
+  transition:
+    color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    background-color 0.25s ease;
 }
 
 .saveBtn::before,

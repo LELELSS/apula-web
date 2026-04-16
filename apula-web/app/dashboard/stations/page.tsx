@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import AdminHeader from "@/components/shared/adminHeader";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
+import AdminTutorialChat from "@/components/Chatbot/AdminTutorialChat";
 import styles from "./stations.module.css";
+import { FaInfoCircle } from "react-icons/fa";
 import {
   addDoc,
   collection,
@@ -121,6 +123,14 @@ export default function StationsPage() {
       setSelectedVehicleId("");
     }
   }, [availableVehicles, selectedVehicleId]);
+
+  const getPageDescription = () => {
+    if (editingStation) {
+      return "This page allows admins to manage station records, update station details, assign vehicles with linked teams, and remove assigned resources when needed.";
+    }
+
+    return "This page displays all fire stations, their addresses, linked teams, and assigned vehicles. Admins can create new stations, assign vehicles to stations, and manage existing station records.";
+  };
 
   const reverseGeocode = async (coords: LatLngValue) => {
     try {
@@ -612,9 +622,8 @@ export default function StationsPage() {
     <div className={styles.pageWrapper}>
       <AdminHeader />
 
-      <div style={{ position: "absolute", top: 20, right: 30, zIndex: 50 }}>
-        <AlertBellButton />
-      </div>
+      <AlertBellButton />
+      <AdminTutorialChat />
 
       <AlertDispatchModal />
 
@@ -631,6 +640,11 @@ export default function StationsPage() {
           </div>
 
           <hr className={styles.separator} />
+
+          <div className={styles.infoBox}>
+            <FaInfoCircle className={styles.infoIcon} />
+            <p className={styles.infoText}>{getPageDescription()}</p>
+          </div>
 
           <div className={styles.assignCard}>
             <h3 className={styles.assignTitle}>Assign Vehicle to Station</h3>

@@ -5,7 +5,7 @@ import Lottie from "lottie-react";
 import fireAnimation from "@/public/lottie/fire.json";
 import AdminHeader from "@/components/shared/adminHeader";
 import styles from "./tv.module.css";
-import { FaSearch } from "react-icons/fa";
+import { FaSearch, FaInfoCircle } from "react-icons/fa";
 import {
   collection,
   query,
@@ -17,6 +17,7 @@ import {
 import { db } from "@/lib/firebase";
 import AlertBellButton from "@/components/AlertDispatch/AlertBellButton";
 import AlertDispatchModal from "@/components/AlertDispatch/AlertDispatchModal";
+import AdminTutorialChat from "@/components/Chatbot/AdminTutorialChat";
 
 export default function AssignPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -77,17 +78,14 @@ export default function AssignPage() {
       const bUnassigned =
         !String(b.teamId || "").trim() || !String(b.teamName || "").trim();
 
-      // 1. Unassigned first
       if (aUnassigned && !bUnassigned) return -1;
       if (!aUnassigned && bUnassigned) return 1;
 
-      // 2. Leaders below unassigned
       if (!aUnassigned && !bUnassigned) {
         if (aLeader && !bLeader) return -1;
         if (!aLeader && bLeader) return 1;
       }
 
-      // 3. Normal alphabetical order
       return (a.name || "").localeCompare(b.name || "");
     });
   }, [responders, searchTerm, teamList]);
@@ -120,6 +118,14 @@ export default function AssignPage() {
       vehicleList.find((v) => v.code === responder.vehicleCode) ||
       null
     );
+  };
+
+  const getPageDescription = () => {
+    if (isAssignMode) {
+      return "Assign mode is active. You can change the team assignment of responders who are not team leaders, then save the updates once the changes are complete.";
+    }
+
+    return "This table displays all approved responders together with their current team and truck assignment. Unassigned responders are highlighted for easier monitoring and assignment.";
   };
 
   const handleToggleAssignMode = () => {
@@ -257,9 +263,8 @@ export default function AssignPage() {
         <div>
           <AdminHeader />
 
-          <div style={{ position: "absolute", top: 20, right: 30 }}>
-            <AlertBellButton />
-          </div>
+          <AlertBellButton />
+          <AdminTutorialChat />
 
           <AlertDispatchModal />
 
@@ -268,6 +273,11 @@ export default function AssignPage() {
               <h2 className={styles.pageTitle}>Assign Member</h2>
 
               <hr className={styles.separator} />
+
+              <div className={styles.infoBox}>
+                <FaInfoCircle className={styles.infoIcon} />
+                <p className={styles.infoText}>{getPageDescription()}</p>
+              </div>
 
               <div className={styles.searchWrapper}>
                 <div className={styles.searchBox}>
@@ -280,14 +290,7 @@ export default function AssignPage() {
                   />
                 </div>
 
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "10px",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                  }}
-                >
+                <div className={styles.topActions}>
                   <button
                     className={styles.assignBtn}
                     onClick={handleToggleAssignMode}
@@ -337,9 +340,7 @@ export default function AssignPage() {
                         <td data-label="Name">
                           {r.name}
                           {leaderTeam && (
-                            <span style={{ color: "#c0392b", marginLeft: 8 }}>
-                              (Leader)
-                            </span>
+                            <span className={styles.leaderTag}>(Leader)</span>
                           )}
                           {isUnassigned && (
                             <span className={styles.unassignedTag}>
@@ -379,13 +380,7 @@ export default function AssignPage() {
               </table>
 
               {isAssignMode && !hasChanges && (
-                <p
-                  style={{
-                    marginTop: "12px",
-                    color: "#666",
-                    fontSize: "14px",
-                  }}
-                >
+                <p className={styles.assignHint}>
                   Change a team assignment, then click Save.
                 </p>
               )}

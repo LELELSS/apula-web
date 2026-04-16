@@ -135,7 +135,7 @@
   background-color: var(--header-bg);
   box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
   transition: left 0.3s ease-in-out;
-  z-index: 1100;
+  z-index: 1101;
   overflow: hidden;
 }
 

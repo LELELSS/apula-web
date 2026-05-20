@@ -683,7 +683,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 50000;
   padding: 16px;
 }
 
@@ -692,7 +692,7 @@
   border-radius: 16px;
   color: #000;
   width: 100%;
-  max-width: 650px;
+  max-width: 700px;
   height: 90vh;
   max-height: 90vh;
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
@@ -713,6 +713,7 @@
 .modalViewBody {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 18px 24px;
   display: flex;
   flex-direction: column;

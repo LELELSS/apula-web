@@ -1574,14 +1574,6 @@ const AlertDispatchModal = () => {
 
                             <td
                               data-label="Action"
-                              style={{
-                                display: "flex",
-                                justifyContent: "center",
-                                alignItems: "center",
-                                gap: "8px",
-                                flexWrap: "wrap",
-                                minHeight: "100%",
-                              }}
                               onClick={(e) => e.stopPropagation()}
                             >
                               {normalizeStatus(a.status) === "pending" && (

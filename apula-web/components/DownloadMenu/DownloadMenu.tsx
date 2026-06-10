@@ -320,7 +320,7 @@ async function exportPDFFallback(
   if (dataType === "graph" && chartRef?.current) {
     const url = await captureChart(chartRef.current);
     if (url)
-      chartImgTag = `<img src="${url}" style="width:100%;border-radius:8px;margin:16px 0" />`;
+      chartImgTag = `<img src="${url}" style="width:100%;border-radius:8px;margin:15px 0" />`;
   }
 
   const tableRows = rows

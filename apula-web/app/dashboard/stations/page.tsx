@@ -98,7 +98,9 @@ export default function StationsPage() {
 
   const sortedStations = useMemo(
     () =>
-      [...stations].sort((a, b) => (a.name || "").localeCompare(b.name || "")),
+      [...stations].sort((a, b) =>
+        (a.teamNames?.[0] || "").localeCompare(b.teamNames?.[0] || "")
+      ),
     [stations],
   );
 

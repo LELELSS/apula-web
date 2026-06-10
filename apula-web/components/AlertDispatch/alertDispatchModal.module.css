@@ -854,7 +854,343 @@
 .clickableRow:hover td {
   background: #fff5f5;
 }
+.validationDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
+.fieldCard {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 0.5px solid #e8e8e8;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: box-shadow 0.15s ease;
+}
+
+.fieldCard:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.fieldCardDanger {
+  background: #fff3f3;
+  border-color: #f7c1c1;
+}
+
+.fieldIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 16px;
+  color: #666;
+}
+
+.fieldIconDanger {
+  background: #f7c1c1;
+  color: #a32d2d;
+}
+
+.fieldIconInfo {
+  background: #dbeafe;
+  color: #1e5fa5;
+}
+
+.fieldIconFire {
+  background: #faece7;
+  color: #993c1d;
+}
+
+.fieldIconGreen {
+  background: #eaf3de;
+  color: #3b6d11;
+}
+
+.fieldContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.fieldLabelDanger {
+  color: #a32d2d;
+}
+
+.fieldValue {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a1a;
+  word-break: break-word;
+}
+
+.fieldValueDanger {
+  color: #791f1f;
+}
+
+.noReport {
+  font-size: 14px;
+  color: #888;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.fieldIconAmber {
+  background: #faeeda;
+  color: #854f0b;
+}
+
+.formDivider {
+  height: 0.5px;
+  background: #e8e8e8;
+  margin: 4px 0;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #555;
+}
+
+.required {
+  color: #a32d2d;
+}
+
+.radioGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 0.5px solid #e8e8e8;
+  background: #fafafa;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.radioLabel:hover {
+  background: #f0f4ff;
+  border-color: #b5d4f4;
+}
+
+.radioInput {
+  accent-color: #8b1a1a;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.radioText {
+  font-size: 13px;
+  color: #1a1a1a;
+}
+
+.checkboxGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 0.5px solid #e8e8e8;
+  background: #fafafa;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.checkboxLabel:hover {
+  background: #f0f4ff;
+  border-color: #b5d4f4;
+}
+
+.checkboxInput {
+  accent-color: #8b1a1a;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.checkboxText {
+  font-size: 13px;
+  color: #1a1a1a;
+}
+
+.othersInput {
+  margin-top: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 0.5px solid #e8e8e8;
+  font-size: 13px;
+  color: #1a1a1a;
+  background: #fff;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.othersInput:focus {
+  border-color: #b5d4f4;
+}
+
+.remarksTextarea {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 0.5px solid #e8e8e8;
+  font-size: 13px;
+  color: #1a1a1a;
+  background: #fff;
+  resize: vertical;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.remarksTextarea:focus {
+  border-color: #b5d4f4;
+}
+
+.fieldError {
+  font-size: 11px;
+  color: #a32d2d;
+  margin-top: 2px;
+}
+
+.reviewBtn {
+  margin-top: 6px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  background: #8b1a1a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  align-self: flex-end;
+  transition: background 0.15s ease;
+}
+
+.reviewBtn:hover {
+  background: #6e1414;
+}
+
+.reviewBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reviewModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.reviewModalContent {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.reviewModalTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.reviewModalSubtitle {
+  font-size: 13px;
+  color: #888;
+  margin: -8px 0 0;
+}
+
+.reviewFields {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 0.5px solid #e8e8e8;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.reviewRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 0.5px solid #f0f0f0;
+}
+
+.reviewRow:last-child {
+  border-bottom: none;
+}
+
+.reviewRowLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #888;
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+
+.reviewRowValue {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1a1a1a;
+  text-align: right;
+}
+
+.reviewModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 /* ANIMATION */
 @keyframes fadeInScale {
   from {

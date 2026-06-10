@@ -81,12 +81,10 @@ export default function AssignPage() {
       if (aUnassigned && !bUnassigned) return -1;
       if (!aUnassigned && bUnassigned) return 1;
 
-      if (!aUnassigned && !bUnassigned) {
-        if (aLeader && !bLeader) return -1;
-        if (!aLeader && bLeader) return 1;
-      }
+      if (aLeader && !bLeader) return -1;
+      if (!aLeader && bLeader) return 1;
 
-      return (a.name || "").localeCompare(b.name || "");
+      return (a.teamName || "").localeCompare(b.teamName || "");
     });
   }, [responders, searchTerm, teamList]);
 
@@ -314,6 +312,7 @@ export default function AssignPage() {
                   <tr>
                     <th>Name</th>
                     <th>Team</th>
+                    <th>Status</th>
                     <th>Truck</th>
                   </tr>
                 </thead>
@@ -368,6 +367,21 @@ export default function AssignPage() {
                           ) : (
                             assignedTeam?.teamName || "Unassigned"
                           )}
+                        </td>
+
+                        <td data-label="Status">
+                          <span
+                            className={
+                              r.status === "Unavailable"
+                                ? styles.statusUnavailable
+                                : styles.statusAvailable
+                            }
+                          >
+                            {r.status || "Available"}
+                            {r.status === "Unavailable" && r.unavailableReason
+                              ? ` — ${r.unavailableReason}`
+                              : ""}
+                          </span>
                         </td>
 
                         <td data-label="Truck">

@@ -166,6 +166,8 @@
   display: inline-block;
 }
 
+
+
 .unassignedRow {
   background: #fff3f3;
 }
@@ -204,8 +206,8 @@
 }
 
 .statusUnavailable {
-  background: #eeeeee;
-  color: #555;
+  background: #ffdfdf;
+  color: #dc2626;
   padding: 6px 12px;
   border-radius: 20px;
   font-size: 13px;

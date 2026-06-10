@@ -123,8 +123,10 @@ export default function UsersPage() {
   };
 
   const filteredUsers = useMemo(() => {
-    return users.filter((u) => roleMatches(u) && matchesSearch(u));
-  }, [users, selectedRole, searchTerm]);
+  return users
+    .filter((u) => roleMatches(u) && matchesSearch(u))
+    .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+}, [users, selectedRole, searchTerm]);
 
   useEffect(() => {
     setCurrentPage(1);

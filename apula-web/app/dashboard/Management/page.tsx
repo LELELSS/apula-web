@@ -588,7 +588,7 @@ export default function TeamVehiclePage() {
                 </thead>
 
                 <tbody>
-                  {teams.map((team) => {
+                  {[...teams].sort((a, b) => (a.teamName ?? "").localeCompare(b.teamName ?? "")).map((team) => {
                     const memberCount = responders.filter(
                       (r) => r.teamId === team.id,
                     ).length;
@@ -683,7 +683,7 @@ export default function TeamVehiclePage() {
                 </thead>
 
                 <tbody>
-                  {vehicles.map((v) => (
+                  {[...vehicles].sort((a, b) => (a.code ?? "").localeCompare(b.code ?? "")).map((v) => (
                     <tr key={v.id}>
                       <td data-label="Vehicle Code">{v.code}</td>
                       <td data-label="Plate Number">{v.plate}</td>

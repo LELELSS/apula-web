@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import styles from "./alertDispatchModal.module.css";
+import { FaUserCheck, FaClock, FaFire, FaExclamationTriangle, FaBuilding, FaTools, FaCommentDots } from "react-icons/fa";
 
 import {
   collection,
@@ -19,6 +20,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { logActivity } from "@/lib/activityLog";
+import AlreadyRadioedForm from "./AlreadyRadioedForm";
 
 const normalizeStatus = (value: unknown) =>
   String(value || "")
@@ -1876,102 +1878,222 @@ const AlertDispatchModal = () => {
                     {getValidationReport(previewAlert) ? (
                       getValidationReport(previewAlert)
                         ?.skippedBecauseRadioed ? (
-                        <>
-                          {hasDisplayValue(
-                            getValidationReport(previewAlert)?.validatedBy,
-                          ) && (
-                            <p>
-                              <strong>Validated By:</strong>{" "}
-                              {getValidationReport(previewAlert)?.validatedBy}
-                            </p>
-                          )}
-
-                          {hasDisplayValue(
-                            getValidationTimeValue(previewAlert),
-                          ) && (
-                            <p>
-                              <strong>Validation Time:</strong>{" "}
-                              {formatValidationTime(
-                                getValidationTimeValue(previewAlert),
-                              )}
-                            </p>
-                          )}
-                        </>
+                        <AlreadyRadioedForm
+                          previewAlert={previewAlert}
+                          getValidationReport={getValidationReport}
+                          hasDisplayValue={hasDisplayValue}
+                          formatValidationTime={formatValidationTime}
+                          getValidationTimeValue={getValidationTimeValue}
+                          styles={styles}
+                          onUpdated={(updatedAlert) => {
+                            setPreviewAlert(updatedAlert);
+                          }}
+                        />
                       ) : (
                         <>
+                          {/* Validated By */}
                           {hasDisplayValue(
                             getValidationReport(previewAlert)?.validatedBy,
                           ) && (
-                            <p>
-                              <strong>Validated By:</strong>{" "}
-                              {getValidationReport(previewAlert)?.validatedBy}
-                            </p>
+                            <div className={styles.fieldCard}>
+                              <div
+                                className={`${styles.fieldIcon} ${styles.fieldIconInfo}`}
+                              >
+                                <FaUserCheck aria-hidden="true" />
+                              </div>
+                              <div className={styles.fieldContent}>
+                                <span className={styles.fieldLabel}>
+                                  Validated By
+                                </span>
+                                <span className={styles.fieldValue}>
+                                  {
+                                    getValidationReport(previewAlert)
+                                      ?.validatedBy
+                                  }
+                                </span>
+                              </div>
+                            </div>
                           )}
 
+                          {/* Validation Time */}
                           {hasDisplayValue(
                             getValidationTimeValue(previewAlert),
                           ) && (
-                            <p>
-                              <strong>Validation Time:</strong>{" "}
-                              {formatValidationTime(
-                                getValidationTimeValue(previewAlert),
-                              )}
-                            </p>
+                            <div className={styles.fieldCard}>
+                              <div
+                                className={`${styles.fieldIcon} ${styles.fieldIconInfo}`}
+                              >
+                                <FaClock aria-hidden="true" />
+                              </div>
+                              <div className={styles.fieldContent}>
+                                <span className={styles.fieldLabel}>
+                                  Validation Time
+                                </span>
+                                <span className={styles.fieldValue}>
+                                  {formatValidationTime(
+                                    getValidationTimeValue(previewAlert),
+                                  )}
+                                </span>
+                              </div>
+                            </div>
                           )}
 
+                          {/* Fire Status Upon Arrival */}
                           {hasDisplayValue(
-                            getValidationReport(previewAlert)?.fireTypes,
+                            getValidationReport(previewAlert)
+                              ?.fireStatusUponArrival ??
+                              getValidationReport(previewAlert)?.fireStatus ??
+                              getValidationReport(previewAlert)
+                                ?.statusUponArrival,
                           ) && (
-                            <p>
-                              <strong>Fire Type:</strong>{" "}
-                              {formatListValue(
-                                getValidationReport(previewAlert)?.fireTypes,
-                                "",
-                              )}
-                            </p>
+                            <div className={styles.fieldCard}>
+                              <div
+                                className={`${styles.fieldIcon} ${styles.fieldIconFire}`}
+                              >
+                                <FaFire aria-hidden="true" />
+                              </div>
+                              <div className={styles.fieldContent}>
+                                <span className={styles.fieldLabel}>
+                                  Fire Status Upon Arrival
+                                </span>
+                                <span className={styles.fieldValue}>
+                                  {getValidationReport(previewAlert)
+                                    ?.fireStatusUponArrival ??
+                                    getValidationReport(previewAlert)
+                                      ?.fireStatus ??
+                                    getValidationReport(previewAlert)
+                                      ?.statusUponArrival}
+                                </span>
+                              </div>
+                            </div>
                           )}
 
-                          {hasDisplayValue(
-                            getValidationReport(previewAlert)?.sourceOfFire,
-                          ) && (
-                            <p>
-                              <strong>Source of Fire:</strong>{" "}
-                              {getValidationReport(previewAlert)?.sourceOfFire}
-                            </p>
-                          )}
+                          {/* Fire Severity — hidden when false alarm */}
+                          {(() => {
+                            const report = getValidationReport(previewAlert);
+                            const fireStatus = (
+                              report?.fireStatusUponArrival ??
+                              report?.fireStatus ??
+                              report?.statusUponArrival ??
+                              ""
+                            )
+                              .toString()
+                              .toLowerCase();
+                            const isFalseAlarm =
+                              fireStatus.includes("false alarm") ||
+                              fireStatus.includes("false");
 
-                          {getValidationReport(previewAlert)
-                            ?.injuredOrTrapped === true && (
-                            <p>
-                              <strong>Injured / Trapped:</strong> Yes
-                            </p>
-                          )}
+                            return !isFalseAlarm &&
+                              hasDisplayValue(
+                                report?.fireSeverity ??
+                                  report?.severity ??
+                                  report?.severityLevel,
+                              ) ? (
+                              <div className={styles.fieldCard}>
+                                <div
+                                  className={`${styles.fieldIcon} ${styles.fieldIconAmber}`}
+                                >
+                                  <FaExclamationTriangle aria-hidden="true" />
+                                </div>
+                                <div className={styles.fieldContent}>
+                                  <span className={styles.fieldLabel}>
+                                    Fire Severity
+                                  </span>
+                                  <span className={styles.fieldValue}>
+                                    {report?.fireSeverity ??
+                                      report?.severity ??
+                                      report?.severityLevel}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
 
+                          {/* Fire Type — hidden when false alarm */}
+                          {(() => {
+                            const report = getValidationReport(previewAlert);
+                            const fireStatus = (
+                              report?.fireStatusUponArrival ??
+                              report?.fireStatus ??
+                              report?.statusUponArrival ??
+                              ""
+                            )
+                              .toString()
+                              .toLowerCase();
+                            const isFalseAlarm =
+                              fireStatus.includes("false alarm") ||
+                              fireStatus.includes("false");
+
+                            return !isFalseAlarm &&
+                              hasDisplayValue(report?.fireTypes) ? (
+                              <div className={styles.fieldCard}>
+                                <div
+                                  className={`${styles.fieldIcon} ${styles.fieldIconFire}`}
+                                >
+                                  <FaBuilding aria-hidden="true" />
+                                </div>
+                                <div className={styles.fieldContent}>
+                                  <span className={styles.fieldLabel}>
+                                    Fire Type
+                                  </span>
+                                  <span className={styles.fieldValue}>
+                                    {formatListValue(report?.fireTypes, "")}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
+                          {/* Resources Needed */}
                           {hasDisplayValue(
                             getValidationReport(previewAlert)?.resourcesNeeded,
                           ) && (
-                            <p>
-                              <strong>Resources Needed:</strong>{" "}
-                              {formatListValue(
-                                getValidationReport(previewAlert)
-                                  ?.resourcesNeeded,
-                                "",
-                              )}
-                            </p>
+                            <div className={styles.fieldCard}>
+                              <div
+                                className={`${styles.fieldIcon} ${styles.fieldIconGreen}`}
+                              >
+                                <FaTools aria-hidden="true" />
+                              </div>
+                              <div className={styles.fieldContent}>
+                                <span className={styles.fieldLabel}>
+                                  Resources Needed
+                                </span>
+                                <span className={styles.fieldValue}>
+                                  {formatListValue(
+                                    getValidationReport(previewAlert)
+                                      ?.resourcesNeeded,
+                                    "",
+                                  )}
+                                </span>
+                              </div>
+                            </div>
                           )}
 
+                          {/* Remarks */}
                           {hasDisplayValue(
                             getValidationReport(previewAlert)?.remarks,
                           ) && (
-                            <p>
-                              <strong>Remarks:</strong>{" "}
-                              {getValidationReport(previewAlert)?.remarks}
-                            </p>
+                            <div className={styles.fieldCard}>
+                              <div
+                                className={`${styles.fieldIcon} ${styles.fieldIconInfo}`}
+                              >
+                                <FaCommentDots aria-hidden="true" />
+                              </div>
+                              <div className={styles.fieldContent}>
+                                <span className={styles.fieldLabel}>
+                                  Remarks
+                                </span>
+                                <span className={styles.fieldValue}>
+                                  {getValidationReport(previewAlert)?.remarks}
+                                </span>
+                              </div>
+                            </div>
                           )}
                         </>
                       )
                     ) : (
-                      <p>No validation report available.</p>
+                      <p className={styles.noReport}>
+                        No validation report available.
+                      </p>
                     )}
                   </div>
                 </div>
@@ -2091,6 +2213,14 @@ const AlertDispatchModal = () => {
                 <button
                   className={styles.dispatchBtn}
                   onClick={() => confirmIncident(previewAlert)}
+                  disabled={
+                    !!getValidationReport(previewAlert)?.skippedBecauseRadioed
+                  }
+                  title={
+                    getValidationReport(previewAlert)?.skippedBecauseRadioed
+                      ? "Complete the validation report above before confirming."
+                      : undefined
+                  }
                 >
                   Confirm
                 </button>

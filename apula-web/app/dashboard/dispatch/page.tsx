@@ -190,7 +190,13 @@ const DispatchPage: React.FC = () => {
         status,
       };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((a: any, b: any) => {
+      const statusOrder: Record<string, number> = { Available: 0, Dispatched: 1, Unavailable: 2 };
+      const statusDiff = (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
+      if (statusDiff !== 0) return statusDiff;
+      return (a.team || "").localeCompare(b.team || "");
+    });
 
   const openAlertModal = async () => {
     const alertsSnap = await getDocs(

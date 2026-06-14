@@ -930,7 +930,7 @@ const AdminDashboard = () => {
                           padding={{ left: 10, right: 10 }}
                         />
                         <YAxis allowDecimals={false} />
-                        <Tooltip labelFormatter={tooltipLabelFormatter} />
+                       
                         <Line
                           type="monotone"
                           dataKey="alerts"
@@ -960,7 +960,7 @@ const AdminDashboard = () => {
                           padding={{ left: 10, right: 10 }}
                         />
                         <YAxis allowDecimals={false} />
-                        <Tooltip labelFormatter={tooltipLabelFormatter} />
+                       
                         <Bar
                           dataKey="alerts"
                           fill="#2563eb"

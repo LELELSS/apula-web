@@ -91,24 +91,23 @@ async function exportPDF(
   dataType: DataType,
   chartRef?: React.RefObject<HTMLDivElement>,
 ) {
-  const { default: jsPDF } = await import(
-    // @ts-expect-error
-    "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
-  ).catch(() => ({ default: null }));
-
-  if (!jsPDF) {
-    exportPDFFallback(
-      title,
-      subtitle,
-      description,
-      columns,
-      rows,
-      filename,
-      dataType,
-      chartRef,
-    );
+  // REPLACE WITH:
+const jsPDF = await new Promise<any>((resolve) => {
+  if ((window as any).jspdf?.jsPDF) {
+    resolve((window as any).jspdf.jsPDF);
     return;
   }
+  const script = document.createElement("script");
+  script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+  script.onload = () => resolve((window as any).jspdf?.jsPDF ?? null);
+  script.onerror = () => resolve(null);
+  document.head.appendChild(script);
+});
+
+if (!jsPDF) {
+  exportPDFFallback(title, subtitle, description, columns, rows, filename, dataType, chartRef);
+  return;
+}
 
   // Capture chart snapshot if needed
   let chartDataUrl: string | null = null;
@@ -120,7 +119,7 @@ async function exportPDF(
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const margin = 18;
+  const margin = 20;
 
   /* ── Header banner ── */
   doc.setFillColor(163, 0, 0);
@@ -131,7 +130,7 @@ async function exportPDF(
       logoImg.naturalWidth && logoImg.naturalHeight
         ? logoImg.naturalWidth / logoImg.naturalHeight
         : 3.25;
-    const logoH = 200;
+    const logoH = 20;
     const logoW = Math.min(55, logoH * aspect);
     doc.addImage(logoImg, "PNG", margin, (32 - logoH) / 2, logoW, logoH);
   } else {
@@ -166,19 +165,22 @@ async function exportPDF(
   doc.setTextColor(50, 50, 50);
   doc.text(`Generated: ${new Date().toLocaleString()}`, margin, 53);
 
-  let infoY = 200;
+  let infoY = 53; // ← fixed: continue from where "Generated:" was placed
   if (subtitle) {
-    infoY += 7;
-    doc.text(`Filter: ${subtitle}`, margin, infoY);
-  }
   infoY += 7;
-  doc.text(`Total Records: ${rows.length}`, margin, infoY);
-  infoY += 7;
-  doc.text(
-    `Export Type: ${dataType === "graph" ? "Graph / Chart" : "Table Data"}`,
-    margin,
-    infoY,
+
+  const subtitleLines = doc.splitTextToSize(
+    `Filter: ${subtitle}`,
+    pageW - margin * 2
   );
+
+  doc.text(subtitleLines, margin, infoY);
+
+  // Move Y based on actual wrapped height
+  infoY += subtitleLines.length * 4.5;
+}
+
+infoY += 7;
 
   /* ── Description paragraph ── */
   if (description) {
@@ -206,45 +208,48 @@ async function exportPDF(
 
   let y = infoY + 8;
 
-  /* ── Graph mode ── */
-  if (dataType === "graph") {
-    if (chartDataUrl) {
-      const imgW = pageW - margin * 2;
-      const imgH = imgW * 0.55; // ~16:9 ratio
-      const footerHeight = 12;
-      const paperBottomMargin = 15;
 
-      if (y > pageH - footerHeight - paperBottomMargin) {
-        doc.addPage();
-        y = 20;
-      }
-      doc.addImage(chartDataUrl, "PNG", margin, y, imgW, imgH);
-      y += imgH + 6;
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(8);
-      doc.setTextColor(160, 160, 160);
-      doc.text("Chart captured at time of export.", margin, y);
-    } else {
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(9);
-      doc.setTextColor(160, 160, 160);
-      doc.text(
-        "Graph capture unavailable. Showing table data as fallback.",
-        margin,
-        y,
-      );
-      y += 8;
-      renderPDFTable(doc, columns, rows, margin, y, pageW, pageH);
-    }
-    finalizePDFFooter(doc, pageH, margin);
-    doc.save(`${filename}.pdf`);
-    return;
+
+  /* ── Graph mode ── */
+if (dataType === "graph") {
+  if (chartDataUrl) {
+    const imgW = pageW - margin * 2;
+    const imgH = imgW * 0.55;
+
+    doc.addImage(chartDataUrl, "PNG", margin, y, imgW, imgH);
+
+    y += imgH + 10;
+  } else {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9);
+    doc.setTextColor(160, 160, 160);
+    doc.text(
+      "Graph capture unavailable. Showing table data as fallback.",
+      margin,
+      y
+    );
+    y += 10;
   }
 
+  // Start table on a new page
+  doc.addPage();
+  y = 20;
+}
   /* ── Table mode ── */
-  renderPDFTable(doc, columns, rows, margin, y, pageW, pageH);
-  finalizePDFFooter(doc, pageH, margin);
-  doc.save(`${filename}.pdf`);
+
+renderPDFTable(doc, columns, rows, margin, y, pageW, pageH);
+finalizePDFFooter(doc, pageH, margin);
+doc.save(`${filename}.pdf`);
+}
+
+ // Add this helper right above renderPDFTable:
+function truncateText(doc: any, text: string, maxWidth: number): string {
+  const ellipsis = "...";
+  if (doc.getTextWidth(text) <= maxWidth) return text;
+  while (text.length > 0 && doc.getTextWidth(text + ellipsis) > maxWidth) {
+    text = text.slice(0, -1);
+  }
+  return text + ellipsis;
 }
 
 function renderPDFTable(
@@ -257,37 +262,118 @@ function renderPDFTable(
   pageH: number,
 ) {
   let y = startY;
-  const colWidth = (pageW - margin * 2) / columns.length;
 
-  doc.setFillColor(163, 0, 0);
-  doc.rect(margin, y, pageW - margin * 2, 8, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(255, 255, 255);
-  columns.forEach((col, i) =>
-    doc.text(col, margin + i * colWidth + 3, y + 5.5),
-  );
-  y += 8;
+  const cellPadding = 3;
+  const colWidth = (pageW - margin * 2) / columns.length;
+  const maxTextWidth = colWidth - 6;
+
+  const drawHeader = () => {
+    let headerHeight = 8;
+
+    const wrappedHeaders = columns.map((col) => {
+      const lines = doc.splitTextToSize(String(col), maxTextWidth);
+      headerHeight = Math.max(headerHeight, lines.length * 4 + 4);
+      return lines;
+    });
+
+    doc.setFillColor(163, 0, 0);
+    doc.rect(
+      margin,
+      y,
+      pageW - margin * 2,
+      headerHeight,
+      "F"
+    );
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+
+    wrappedHeaders.forEach((lines, i) => {
+      doc.text(
+        lines,
+        margin + i * colWidth + cellPadding,
+        y + 4
+      );
+
+      doc.setDrawColor(255, 255, 255);
+      doc.rect(
+        margin + i * colWidth,
+        y,
+        colWidth,
+        headerHeight
+      );
+    });
+
+    y += headerHeight;
+  };
+
+  drawHeader();
 
   rows.forEach((row, ri) => {
-    if (y > pageH - 20) {
+    let rowHeight = 7;
+
+    const wrappedCells = row.map((cell) => {
+      const lines = doc.splitTextToSize(
+        String(cell ?? ""),
+        maxTextWidth
+      );
+
+      rowHeight = Math.max(
+        rowHeight,
+        lines.length * 4 + 4
+      );
+
+      return lines;
+    });
+
+    const footerHeight = 12;
+    const bottomMargin = 30;
+
+    if (y + rowHeight > pageH - footerHeight - bottomMargin) {
       doc.addPage();
       y = 20;
+      drawHeader();
     }
+
     if (ri % 2 === 0) {
       doc.setFillColor(255, 240, 240);
-      doc.rect(margin, y, pageW - margin * 2, 7, "F");
+      doc.rect(
+        margin,
+        y,
+        pageW - margin * 2,
+        rowHeight,
+        "F"
+      );
     }
+
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(40, 40, 40);
-    row.forEach((cell, i) =>
-      doc.text(String(cell ?? ""), margin + i * colWidth + 3, y + 5),
-    );
-    y += 7;
+
+    wrappedCells.forEach((lines, i) => {
+      doc.text(
+        lines,
+        margin + i * colWidth + cellPadding,
+        y + 4
+      );
+    });
+
+    row.forEach((_, i) => {
+      doc.setDrawColor(230, 230, 230);
+      doc.setLineWidth(0.2);
+
+      doc.rect(
+        margin + i * colWidth,
+        y,
+        colWidth,
+        rowHeight
+      );
+    });
+
+    y += rowHeight;
   });
 }
-
 function finalizePDFFooter(doc: any, pageH: number, margin: number) {
   const pageW = doc.internal.pageSize.getWidth();
   const totalPages = (doc.internal as any).getNumberOfPages?.() ?? 1;
@@ -373,13 +459,16 @@ async function exportPDFFallback(
   <div class="footer">Generated on ${new Date().toLocaleString()}</div>
 </div></body></html>`;
 
-  const win = window.open("", "_blank");
-  if (win) {
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    win.print();
-  }
+ // REPLACE WITH:
+const blob = new Blob([html], { type: "text/html;charset=utf-8;" });
+const url = URL.createObjectURL(blob);
+const a = document.createElement("a");
+a.href = url;
+a.download = `${_filename}.html`;
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+URL.revokeObjectURL(url);
 }
 
 /* ─────────────────────────────────────────────

@@ -158,14 +158,19 @@ const normalizeBase64Snapshot = (value: unknown): string | null => {
 };
 
 const buildSnapshotCandidates = (reportData: ReportItem): string[] => {
-  if (reportData?.snapshotUrl) return buildImageCandidates(reportData.snapshotUrl);
-  const b = normalizeBase64Snapshot(reportData?.snapshotBase64) ||
-            normalizeBase64Snapshot(reportData?.snapshot);
+  if (reportData?.snapshotUrl)
+    return buildImageCandidates(reportData.snapshotUrl);
+  const b =
+    normalizeBase64Snapshot(reportData?.snapshotBase64) ||
+    normalizeBase64Snapshot(reportData?.snapshot);
   return b ? [b] : [];
 };
 
-const buildValidationSnapshotCandidates = (reportData: ReportItem): string[] => {
-  if (reportData?.validationSnapshotUrl) return buildImageCandidates(reportData.validationSnapshotUrl);
+const buildValidationSnapshotCandidates = (
+  reportData: ReportItem,
+): string[] => {
+  if (reportData?.validationSnapshotUrl)
+    return buildImageCandidates(reportData.validationSnapshotUrl);
   const b = normalizeBase64Snapshot(reportData?.validationSnapshotBase64);
   return b ? [b] : [];
 };
@@ -175,7 +180,9 @@ const buildAllImageUrls = (report: ReportItem): string[] => {
   const snapUrl = snap[0] ?? null;
   const all: string[] = [];
   if (snapUrl) all.push(snapUrl);
-  (report.imageUrls || []).forEach((u) => { if (u && u !== snapUrl) all.push(u); });
+  (report.imageUrls || []).forEach((u) => {
+    if (u && u !== snapUrl) all.push(u);
+  });
   return all;
 };
 
@@ -193,49 +200,140 @@ const buildValidationImageUrls = (report: ReportItem): string[] => {
 // ── Barangay list ─────────────────────────────────────────────────────────────
 
 const BACOOR_BARANGAYS = [
-  "All Barangays","Alima","Aniban I","Aniban II","Aniban III","Aniban IV","Aniban V",
-  "Bayanan","Buhay na Tubig","Bukid","Camposanto","Carbonero","Caridad Hills","Casile",
-  "Coast Barrio","Decaibo","Digman","Dulong Bayan","Durungao","Field","Habay I","Habay II",
-  "Kaingin","Ligas I","Ligas II","Ligas III","Mabolo I","Mabolo II","Mabolo III",
-  "Maliksi I","Maliksi II","Maliksi III","Mambog I","Mambog II","Mambog III","Mambog IV",
-  "Mambog V","Mangubat","Molino I","Molino II","Molino III","Molino IV","Molino V",
-  "Molino VI","Molino VII","Niog I","Niog II","Niog III","P.F. Espiritu I","P.F. Espiritu II",
-  "P.F. Espiritu III","P.F. Espiritu IV","P.F. Espiritu V","P.F. Espiritu VI",
-  "P.F. Espiritu VII","P.F. Espiritu VIII","Pasong Buaya I","Pasong Buaya II",
-  "Queensrow Central","Queensrow East","Queensrow West","Real I","Real II","Salinas I",
-  "Salinas II","Salinas III","Salinas IV","San Nicolas I","San Nicolas II","San Nicolas III",
-  "Sineguelasan","Tabing Dagat","Talaba I","Talaba II","Talaba III","Talaba IV","Talaba V",
-  "Talaba VI","Talaba VII","Zapote I","Zapote II","Zapote III","Zapote IV","Zapote V",
+  "All Barangays",
+  "Alima",
+  "Aniban I",
+  "Aniban II",
+  "Aniban III",
+  "Aniban IV",
+  "Aniban V",
+  "Bayanan",
+  "Buhay na Tubig",
+  "Bukid",
+  "Camposanto",
+  "Carbonero",
+  "Caridad Hills",
+  "Casile",
+  "Coast Barrio",
+  "Decaibo",
+  "Digman",
+  "Dulong Bayan",
+  "Durungao",
+  "Field",
+  "Habay I",
+  "Habay II",
+  "Kaingin",
+  "Ligas I",
+  "Ligas II",
+  "Ligas III",
+  "Mabolo I",
+  "Mabolo II",
+  "Mabolo III",
+  "Maliksi I",
+  "Maliksi II",
+  "Maliksi III",
+  "Mambog I",
+  "Mambog II",
+  "Mambog III",
+  "Mambog IV",
+  "Mambog V",
+  "Mangubat",
+  "Molino I",
+  "Molino II",
+  "Molino III",
+  "Molino IV",
+  "Molino V",
+  "Molino VI",
+  "Molino VII",
+  "Niog I",
+  "Niog II",
+  "Niog III",
+  "P.F. Espiritu I",
+  "P.F. Espiritu II",
+  "P.F. Espiritu III",
+  "P.F. Espiritu IV",
+  "P.F. Espiritu V",
+  "P.F. Espiritu VI",
+  "P.F. Espiritu VII",
+  "P.F. Espiritu VIII",
+  "Pasong Buaya I",
+  "Pasong Buaya II",
+  "Queensrow Central",
+  "Queensrow East",
+  "Queensrow West",
+  "Real I",
+  "Real II",
+  "Salinas I",
+  "Salinas II",
+  "Salinas III",
+  "Salinas IV",
+  "San Nicolas I",
+  "San Nicolas II",
+  "San Nicolas III",
+  "Sineguelasan",
+  "Tabing Dagat",
+  "Talaba I",
+  "Talaba II",
+  "Talaba III",
+  "Talaba IV",
+  "Talaba V",
+  "Talaba VI",
+  "Talaba VII",
+  "Zapote I",
+  "Zapote II",
+  "Zapote III",
+  "Zapote IV",
+  "Zapote V",
 ];
 
 // ── IncidentImage component ───────────────────────────────────────────────────
 
-const IncidentImage: React.FC<{ candidates: string[]; alt: string; onClick: () => void }> = ({
-  candidates, alt, onClick,
-}) => {
+const IncidentImage: React.FC<{
+  candidates: string[];
+  alt: string;
+  onClick: () => void;
+}> = ({ candidates, alt, onClick }) => {
   const [index, setIndex] = useState(0);
   const [failed, setFailed] = useState(false);
   const src = candidates[index] || "";
   if (!src || failed) {
     return (
-      <div style={{
-        borderRadius: 8, border: "2px dashed #e5e7eb", aspectRatio: "1",
-        background: "#f3f4f6", display: "flex", alignItems: "center",
-        justifyContent: "center", fontSize: 11, color: "#9ca3af",
-      }}>No image</div>
+      <div
+        style={{
+          borderRadius: 8,
+          border: "2px dashed #e5e7eb",
+          aspectRatio: "1",
+          background: "#f3f4f6",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 11,
+          color: "#9ca3af",
+        }}
+      >
+        No image
+      </div>
     );
   }
   return (
-    <div onClick={onClick} style={{
-      borderRadius: 8, overflow: "hidden", cursor: "pointer",
-      border: "2px solid #e5e7eb", aspectRatio: "1", background: "#f3f4f6",
-      transition: "border-color 0.2s",
-    }}
+    <div
+      onClick={onClick}
+      style={{
+        borderRadius: 8,
+        overflow: "hidden",
+        cursor: "pointer",
+        border: "2px solid #e5e7eb",
+        aspectRatio: "1",
+        background: "#f3f4f6",
+        transition: "border-color 0.2s",
+      }}
       onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#a30000")}
       onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={alt}
+      <img
+        src={src}
+        alt={alt}
         style={{ width: "100%", height: "100%", objectFit: "cover" }}
         onLoad={() => setFailed(false)}
         onError={() => {
@@ -268,7 +366,10 @@ const ReportPage = () => {
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (barangayRef.current && !barangayRef.current.contains(e.target as Node))
+      if (
+        barangayRef.current &&
+        !barangayRef.current.contains(e.target as Node)
+      )
         setBarangayOpen(false);
     };
     document.addEventListener("mousedown", handler);
@@ -278,7 +379,10 @@ const ReportPage = () => {
   useEffect(() => {
     const q = query(collection(db, "alerts"), orderBy("timestamp", "desc"));
     const unsub = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as ReportItem[];
+      const data = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as ReportItem[];
       setReports(data);
       setFilteredReports(data);
     });
@@ -287,52 +391,84 @@ const ReportPage = () => {
 
   useEffect(() => {
     getDocs(collection(db, "teams"))
-      .then((snap) => setTeams(snap.docs.map((d) => ({ id: d.id, ...d.data() })) as TeamItem[]))
+      .then((snap) =>
+        setTeams(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() })) as TeamItem[],
+        ),
+      )
       .catch(() => setTeams([]));
   }, []);
 
   useEffect(() => {
     let result = [...reports].filter(
-      (r) => String(r.status || "").toLowerCase() !== "resolved"
+      (r) => String(r.status || "").toLowerCase() !== "resolved",
     );
     if (filterStatus === "All") {
       result = result.filter((r) =>
-        ["Pending", "Dispatched", "Validated", "Confirmed"].includes(r.status || "")
+        ["Pending", "Dispatched", "Validated", "Confirmed"].includes(
+          r.status || "",
+        ),
       );
     } else {
       result = result.filter((r) => r.status === filterStatus);
     }
     if (filterBarangay !== "All Barangays") {
       result = result.filter((r) =>
-        r.userAddress?.toLowerCase().includes(filterBarangay.toLowerCase())
+        r.userAddress?.toLowerCase().includes(filterBarangay.toLowerCase()),
       );
     }
     if (filterDateFrom) {
-      const from = new Date(filterDateFrom); from.setHours(0, 0, 0, 0);
-      result = result.filter((r) => r.timestamp && new Date(r.timestamp.seconds * 1000) >= from);
+      const from = new Date(filterDateFrom);
+      from.setHours(0, 0, 0, 0);
+      result = result.filter(
+        (r) => r.timestamp && new Date(r.timestamp.seconds * 1000) >= from,
+      );
     }
     if (filterDateTo) {
-      const to = new Date(filterDateTo); to.setHours(23, 59, 59, 999);
-      result = result.filter((r) => r.timestamp && new Date(r.timestamp.seconds * 1000) <= to);
+      const to = new Date(filterDateTo);
+      to.setHours(23, 59, 59, 999);
+      result = result.filter(
+        (r) => r.timestamp && new Date(r.timestamp.seconds * 1000) <= to,
+      );
     }
     result = result.filter(
       (r) =>
         r.userName?.toLowerCase().includes(search.toLowerCase()) ||
-        r.userAddress?.toLowerCase().includes(search.toLowerCase())
+        r.userAddress?.toLowerCase().includes(search.toLowerCase()),
     );
     setFilteredReports(result);
-  }, [reports, search, filterStatus, filterBarangay, filterDateFrom, filterDateTo]);
+  }, [
+    reports,
+    search,
+    filterStatus,
+    filterBarangay,
+    filterDateFrom,
+    filterDateTo,
+  ]);
 
-  useEffect(() => { setCurrentPage(1); }, [search, filterStatus, filterBarangay, filterDateFrom, filterDateTo]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterStatus, filterBarangay, filterDateFrom, filterDateTo]);
 
   useEffect(() => {
     if (!selectedReport) return;
-    const q = query(collection(db, "dispatches"), where("alertId", "==", selectedReport.id));
+    const q = query(
+      collection(db, "dispatches"),
+      where("alertId", "==", selectedReport.id),
+    );
     getDocs(q)
       .then((snap) => {
-        if (snap.empty) { setDispatches([]); return; }
-        const all = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as DispatchInfo[];
-        all.sort((a, b) => (a.timestamp?.seconds ?? 0) - (b.timestamp?.seconds ?? 0));
+        if (snap.empty) {
+          setDispatches([]);
+          return;
+        }
+        const all = snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        })) as DispatchInfo[];
+        all.sort(
+          (a, b) => (a.timestamp?.seconds ?? 0) - (b.timestamp?.seconds ?? 0),
+        );
         setDispatches(all);
       })
       .catch(() => setDispatches([]));
@@ -351,13 +487,20 @@ const ReportPage = () => {
     const name = getTeamName(d);
     return (
       teams.find((t) => t.teamName === name) ||
-      teams.find((t) => t.members?.some((m) => m.teamName === name || m.id === d.responders?.[0]?.teamId)) ||
+      teams.find((t) =>
+        t.members?.some(
+          (m) => m.teamName === name || m.id === d.responders?.[0]?.teamId,
+        ),
+      ) ||
       null
     );
   };
 
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
-  const paginatedReports = filteredReports.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const paginatedReports = filteredReports.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  );
 
   // ── Modal render ────────────────────────────────────────────────────────────
 
@@ -365,7 +508,10 @@ const ReportPage = () => {
     if (!selectedReport) return null;
 
     // DEBUG: log all fields so we can identify exact Firestore field names
-    console.log("[ReportModal] selectedReport fields:", JSON.stringify(selectedReport, null, 2));
+    console.log(
+      "[ReportModal] selectedReport fields:",
+      JSON.stringify(selectedReport, null, 2),
+    );
 
     const allImages = buildAllImageUrls(selectedReport);
     const validationImages = buildValidationImageUrls(selectedReport);
@@ -383,7 +529,8 @@ const ReportPage = () => {
 
     // ── Pull validation fields from every possible location ────────────────
     const sr = selectedReport as any;
-    const vr: ValidationReport | undefined = selectedReport.latestValidationReport;
+    const vr: ValidationReport | undefined =
+      selectedReport.latestValidationReport;
 
     // validatedBy: check nested report first, then every known root-level field
     const validatedBy =
@@ -401,7 +548,9 @@ const ReportPage = () => {
       selectedReport.validatedAt?.seconds ||
       vr?.submittedAt?.seconds ||
       selectedReport.latestValidationSubmittedAt?.seconds ||
-      (typeof sr.latestValidationSubmittedAt === "number" ? sr.latestValidationSubmittedAt : null) ||
+      (typeof sr.latestValidationSubmittedAt === "number"
+        ? sr.latestValidationSubmittedAt
+        : null) ||
       (typeof sr.validatedAt === "number" ? sr.validatedAt : null) ||
       sr.validationSubmittedAt?.seconds ||
       null;
@@ -414,97 +563,245 @@ const ReportPage = () => {
       sr.monitoringStatus ||
       null;
 
-    const monitoredBy =
-      selectedReport.monitoredBy ||
-      sr.monitoringBy ||
-      null;
+    const monitoredBy = selectedReport.monitoredBy || sr.monitoringBy || null;
 
     // ── Primitive sub-components ────────────────────────────────────────────
 
     const TimelineDot = ({ color }: { color: string }) => (
-      <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0, marginTop: 4 }} />
+      <span
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: "50%",
+          background: color,
+          flexShrink: 0,
+          marginTop: 4,
+        }}
+      />
     );
 
-    const TimelineItem = ({ label, ts, by, color, last }: {
-      label: string; ts?: number | null; by?: string | null; color: string; last?: boolean;
+    const TimelineItem = ({
+      label,
+      ts,
+      by,
+      color,
+      last,
+    }: {
+      label: string;
+      ts?: number | null;
+      by?: string | null;
+      color: string;
+      last?: boolean;
     }) => (
       <div style={{ display: "flex", gap: 10, paddingBottom: last ? 0 : 12 }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 18 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            width: 18,
+          }}
+        >
           <TimelineDot color={color} />
-          {!last && <div style={{ flex: 1, width: 2, background: "#e5e7eb", marginTop: 3 }} />}
+          {!last && (
+            <div
+              style={{ flex: 1, width: 2, background: "#e5e7eb", marginTop: 3 }}
+            />
+          )}
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", marginTop: 1 }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: "#6b7280",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}
+          >
+            {label}
+          </div>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              color: "#111827",
+              marginTop: 1,
+            }}
+          >
             {ts ? new Date(ts * 1000).toLocaleString() : "—"}
           </div>
-          {by && <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 1 }}>{by}</div>}
+          {by && (
+            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 1 }}>
+              {by}
+            </div>
+          )}
         </div>
       </div>
     );
 
-    const SectionCard = ({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) => (
-      <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
-        <div style={{
-          padding: "9px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb",
-          display: "flex", alignItems: "center", gap: 6,
-          fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em",
-        }}>
+    const SectionCard = ({
+      icon,
+      title,
+      children,
+    }: {
+      icon: React.ReactNode;
+      title: string;
+      children: React.ReactNode;
+    }) => (
+      <div
+        style={{
+          border: "1px solid #e5e7eb",
+          borderRadius: 12,
+          overflow: "visible",
+        }}
+      >
+        <div
+          style={{
+            padding: "9px 16px",
+            background: "#f9fafb",
+            borderBottom: "1px solid #e5e7eb",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 11,
+            fontWeight: 700,
+            color: "#6b7280",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+          }}
+        >
           {icon}&nbsp;{title}
         </div>
-        <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div
+          style={{
+            padding: "14px 16px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
           {children}
         </div>
       </div>
     );
 
-    const InfoRow = ({ label, value }: { label: string; value?: string | null }) => (
-      <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 6, fontSize: 13.5, alignItems: "baseline" }}>
+    const InfoRow = ({
+      label,
+      value,
+    }: {
+      label: string;
+      value?: string | null;
+    }) => (
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "160px 1fr",
+          gap: 6,
+          fontSize: 13.5,
+          alignItems: "baseline",
+        }}
+      >
         <span style={{ color: "#6b7280", fontWeight: 500 }}>{label}</span>
-        <span style={{ color: "#111827", fontWeight: 500, wordBreak: "break-word" }}>{value || "N/A"}</span>
+        <span
+          style={{ color: "#111827", fontWeight: 500, wordBreak: "break-word" }}
+        >
+          {value || "N/A"}
+        </span>
       </div>
     );
 
     const MetaCard = ({ label, value }: { label: string; value: string }) => (
-      <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "10px 14px" }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{label}</div>
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>{value}</div>
+      <div
+        style={{
+          background: "#f9fafb",
+          border: "1px solid #e5e7eb",
+          borderRadius: 10,
+          padding: "10px 14px",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: "#9ca3af",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+            marginBottom: 4,
+          }}
+        >
+          {label}
+        </div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>
+          {value}
+        </div>
       </div>
     );
 
-    const Divider = () => <div style={{ height: 1, background: "#e5e7eb", margin: "2px 0" }} />;
+    const Divider = () => (
+      <div style={{ height: 1, background: "#e5e7eb", margin: "2px 0" }} />
+    );
 
-    const NoticeBanner = ({ icon, text, colors }: {
-      icon: React.ReactNode; text: string;
+    const NoticeBanner = ({
+      icon,
+      text,
+      colors,
+    }: {
+      icon: React.ReactNode;
+      text: string;
       colors: { bg: string; text: string; border: string };
     }) => (
-      <div style={{
-        padding: "10px 14px", borderRadius: 10, fontSize: 13, fontWeight: 500,
-        display: "flex", alignItems: "center", gap: 10,
-        background: colors.bg, color: colors.text, border: `1px solid ${colors.border}`,
-      }}>
+      <div
+        style={{
+          padding: "10px 14px",
+          borderRadius: 10,
+          fontSize: 13,
+          fontWeight: 500,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          background: colors.bg,
+          color: colors.text,
+          border: `1px solid ${colors.border}`,
+        }}
+      >
         <span style={{ fontSize: 15, flexShrink: 0 }}>{icon}</span>
         {text}
       </div>
     );
 
     const StatusBadge = () => (
-      <span className={`${styles.statusBadge} ${styles[selectedReport.status?.toLowerCase() as keyof typeof styles] || ""}`}>
+      <span
+        className={`${styles.statusBadge} ${styles[selectedReport.status?.toLowerCase() as keyof typeof styles] || ""}`}
+      >
         {selectedReport.status || "Unknown"}
       </span>
     );
 
     // ── Reusable blocks ─────────────────────────────────────────────────────
 
-    const PhotosGrid = ({ images, isValidation = false }: { images: string[]; isValidation?: boolean }) => {
+    const PhotosGrid = ({
+      images,
+      isValidation = false,
+    }: {
+      images: string[];
+      isValidation?: boolean;
+    }) => {
       if (!images.length) return null;
       return (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
+            gap: 8,
+          }}
+        >
           {images.map((url, i) => {
             const snapCandidates = isValidation
               ? buildValidationSnapshotCandidates(selectedReport)
               : buildSnapshotCandidates(selectedReport);
-            const isSnap = i === 0 && snapCandidates.length > 0 && url === snapCandidates[0];
+            const isSnap =
+              i === 0 && snapCandidates.length > 0 && url === snapCandidates[0];
             return (
               <IncidentImage
                 key={i}
@@ -520,14 +817,20 @@ const ReportPage = () => {
 
     const IncidentPhotosBlock = () =>
       hasImages ? (
-        <SectionCard icon={<FaImage style={{ color: "#6b7280" }} />} title={`Incident Photos (${allImages.length})`}>
+        <SectionCard
+          icon={<FaImage style={{ color: "#6b7280" }} />}
+          title={`Incident Photos (${allImages.length})`}
+        >
           <PhotosGrid images={allImages} isValidation={false} />
         </SectionCard>
       ) : null;
 
     const ValidationPhotosBlock = () =>
       hasValidationImages ? (
-        <SectionCard icon={<FaCamera style={{ color: "#6b7280" }} />} title={`Validation Photos (${validationImages.length})`}>
+        <SectionCard
+          icon={<FaCamera style={{ color: "#6b7280" }} />}
+          title={`Validation Photos (${validationImages.length})`}
+        >
           <PhotosGrid images={validationImages} isValidation={true} />
         </SectionCard>
       ) : null;
@@ -536,18 +839,31 @@ const ReportPage = () => {
       const d = dispatches[0] ?? null;
       const matched = d ? getTeamDetails(d) : null;
       const teamName = d ? getTeamName(d) : "—";
-      const leaderName = matched?.leaderName || d?.leaderName || d?.responders?.[0]?.name || "—";
-      const vehicleName = d?.vehicle || d?.responders?.find((r) => r?.vehicle)?.vehicle || "—";
+      const leaderName =
+        matched?.leaderName || d?.leaderName || d?.responders?.[0]?.name || "—";
+      const vehicleName =
+        d?.vehicle || d?.responders?.find((r) => r?.vehicle)?.vehicle || "—";
 
       return (
-        <SectionCard icon={<FaTruck style={{ color: "#6b7280" }} />} title="Response Team">
+        <SectionCard
+          icon={<FaTruck style={{ color: "#6b7280" }} />}
+          title="Response Team"
+        >
           {!d ? (
-            <div style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>
+            <div
+              style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}
+            >
               Dispatch information is still loading or unavailable.
             </div>
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 10,
+                }}
+              >
                 <MetaCard label="Team" value={teamName} />
                 <MetaCard label="Team Leader" value={leaderName} />
                 <MetaCard label="Vehicle" value={vehicleName} />
@@ -555,11 +871,35 @@ const ReportPage = () => {
               {showMembers && d.responders && d.responders.length > 0 && (
                 <>
                   <Divider />
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>Members</div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "#6b7280",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Members
+                  </div>
                   {d.responders.map((r, i) => (
-                    <div key={i} style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 6, fontSize: 13, alignItems: "baseline" }}>
-                      <span style={{ fontWeight: 600, color: "#111827" }}>{r.name || "N/A"}</span>
-                      <span style={{ color: "#6b7280" }}>{[r.contact, r.email].filter(Boolean).join(" · ") || "N/A"}</span>
+                    <div
+                      key={i}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "160px 1fr",
+                        gap: 6,
+                        fontSize: 13,
+                        alignItems: "baseline",
+                      }}
+                    >
+                      <span style={{ fontWeight: 600, color: "#111827" }}>
+                        {r.name || "N/A"}
+                      </span>
+                      <span style={{ color: "#6b7280" }}>
+                        {[r.contact, r.email].filter(Boolean).join(" · ") ||
+                          "N/A"}
+                      </span>
                     </div>
                   ))}
                 </>
@@ -572,55 +912,104 @@ const ReportPage = () => {
 
     // ── ValidationReportBlock ───────────────────────────────────────────────
     const ValidationReportBlock = () => {
-      const v: ValidationReport | null = selectedReport.latestValidationReport ?? null;
+      const v: ValidationReport | null =
+        selectedReport.latestValidationReport ?? null;
 
-      const validatedByStr = [
-        v?.validatedBy,
-        v?.validatedByEmail,
-        validatedBy,
-      ].filter(Boolean).filter((val, idx, arr) => arr.indexOf(val) === idx).join(" · ");
+      const validatedByStr = [v?.validatedBy, v?.validatedByEmail, validatedBy]
+        .filter(Boolean)
+        .filter((val, idx, arr) => arr.indexOf(val) === idx)
+        .join(" · ");
 
-      const submittedAtSec =
-        v?.submittedAt?.seconds ??
-        validatedAt ??
-        null;
+      const submittedAtSec = v?.submittedAt?.seconds ?? validatedAt ?? null;
 
-      const actualImg = normalizeBase64Snapshot(v?.actualFireImageBase64 ?? null);
+      const actualImg = normalizeBase64Snapshot(
+        v?.actualFireImageBase64 ?? null,
+      );
       const fireTypes = Array.isArray(v?.fireTypes) ? v!.fireTypes! : [];
-      const resources = Array.isArray(v?.resourcesNeeded) ? v!.resourcesNeeded! : [];
+      const resources = Array.isArray(v?.resourcesNeeded)
+        ? v!.resourcesNeeded!
+        : [];
 
-      const hasAnyData = v || validatedBy || submittedAtSec || (status === "Validated" || status === "Confirmed");
+      const hasAnyData =
+        v ||
+        validatedBy ||
+        submittedAtSec ||
+        status === "Validated" ||
+        status === "Confirmed";
 
       return (
-        <SectionCard icon={<FaClipboardList style={{ color: "#6b7280" }} />} title="Validation Report">
+        <SectionCard
+          icon={<FaClipboardList style={{ color: "#6b7280" }} />}
+          title="Validation Report"
+        >
           <>
-            {v?.sourceOfFire && <InfoRow label="Source of Fire" value={v.sourceOfFire} />}
+            {v?.sourceOfFire && (
+              <InfoRow label="Source of Fire" value={v.sourceOfFire} />
+            )}
             {v?.remarks && <InfoRow label="Remarks" value={v.remarks} />}
-            {fireTypes.length > 0 && <InfoRow label="Fire Types" value={fireTypes.join(", ")} />}
-            {resources.length > 0 && <InfoRow label="Resources Needed" value={resources.join(", ")} />}
+            {fireTypes.length > 0 && (
+              <InfoRow label="Fire Types" value={fireTypes.join(", ")} />
+            )}
+            {resources.length > 0 && (
+              <InfoRow label="Resources Needed" value={resources.join(", ")} />
+            )}
             <InfoRow label="Validated By" value={validatedByStr || "N/A"} />
             <InfoRow
               label="Submitted At"
-              value={submittedAtSec ? new Date((submittedAtSec as number) * 1000).toLocaleString() : "N/A"}
+              value={
+                submittedAtSec
+                  ? new Date((submittedAtSec as number) * 1000).toLocaleString()
+                  : "N/A"
+              }
             />
             {actualImg && (
               <>
                 <Divider />
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#9ca3af",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
                   Actual Fire Image
                 </div>
                 <div
-                  style={{ width: 140, height: 140, borderRadius: 8, overflow: "hidden", border: "2px solid #e5e7eb", cursor: "pointer", transition: "border-color 0.2s" }}
+                  style={{
+                    width: 140,
+                    height: 140,
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    border: "2px solid #e5e7eb",
+                    cursor: "pointer",
+                    transition: "border-color 0.2s",
+                  }}
                   onClick={() => setLightboxSrc(actualImg)}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#a30000")}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.borderColor = "#a30000")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.borderColor = "#e5e7eb")
+                  }
                 >
-                  <img src={actualImg} alt="Actual fire" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <img
+                    src={actualImg}
+                    alt="Actual fire"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
                 </div>
               </>
             )}
             {!v && !validatedBy && !submittedAtSec && (
-              <div style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>
+              <div
+                style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}
+              >
                 No additional validation details recorded.
               </div>
             )}
@@ -631,19 +1020,34 @@ const ReportPage = () => {
 
     // ── MonitoringBlock ─────────────────────────────────────────────────────
     const MonitoringBlock = () => {
-      const hasData = monitoringMessage || monitoredBy || selectedReport.monitoringUpdatedAt;
+      const hasData =
+        monitoringMessage || monitoredBy || selectedReport.monitoringUpdatedAt;
       return (
-        <SectionCard icon={<FaClipboardList style={{ color: "#6b7280" }} />} title="Monitoring Update">
+        <SectionCard
+          icon={<FaClipboardList style={{ color: "#6b7280" }} />}
+          title="Monitoring Update"
+        >
           {!hasData ? (
-            <div style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>
+            <div
+              style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}
+            >
               No monitoring update has been recorded yet.
             </div>
           ) : (
             <>
-              {monitoringMessage && <InfoRow label="Status Note" value={monitoringMessage} />}
-              {monitoredBy && <InfoRow label="Monitored By" value={monitoredBy} />}
+              {monitoringMessage && (
+                <InfoRow label="Status Note" value={monitoringMessage} />
+              )}
+              {monitoredBy && (
+                <InfoRow label="Monitored By" value={monitoredBy} />
+              )}
               {selectedReport.monitoringUpdatedAt && (
-                <InfoRow label="Updated At" value={new Date(selectedReport.monitoringUpdatedAt.seconds * 1000).toLocaleString()} />
+                <InfoRow
+                  label="Updated At"
+                  value={new Date(
+                    selectedReport.monitoringUpdatedAt.seconds * 1000,
+                  ).toLocaleString()}
+                />
               )}
             </>
           )}
@@ -652,20 +1056,63 @@ const ReportPage = () => {
     };
 
     const ReporterCardCompact = () => (
-      <SectionCard icon={<FaUser style={{ color: "#6b7280" }} />} title="Reporter">
+      <SectionCard
+        icon={<FaUser style={{ color: "#6b7280" }} />}
+        title="Reporter"
+      >
         <InfoRow label="Name" value={selectedReport.userName} />
         <InfoRow label="Contact" value={selectedReport.userContact} />
         <InfoRow label="Address" value={selectedReport.userAddress} />
         <Divider />
-        <InfoRow label="Received" value={alertTimestamp ? new Date(alertTimestamp * 1000).toLocaleString() : null} />
+        <InfoRow
+          label="Received"
+          value={
+            alertTimestamp
+              ? new Date(alertTimestamp * 1000).toLocaleString()
+              : null
+          }
+        />
       </SectionCard>
     );
 
-    const noticeConfig: Record<string, { bg: string; text: string; border: string; icon: React.ReactNode; msg: string }> = {
-      Pending:    { bg: "#fff1f2", text: "#a30000", border: "#fecdd3", icon: <FaExclamationTriangle />, msg: "No team has been dispatched yet. This incident is awaiting response." },
-      Dispatched: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe", icon: <FaTruck />, msg: "A response team has been dispatched and is en route to the incident site." },
-      Validated:  { bg: "#fef9ec", text: "#92400e", border: "#fde68a", icon: <FaSearch />, msg: "The incident has been validated by a field responder and is currently being monitored." },
-      Confirmed:  { bg: "#ecfdf5", text: "#166534", border: "#bbf7d0", icon: <FaCheckCircle />, msg: "This incident has been officially confirmed and resolved by the assigned response team." },
+    const noticeConfig: Record<
+      string,
+      {
+        bg: string;
+        text: string;
+        border: string;
+        icon: React.ReactNode;
+        msg: string;
+      }
+    > = {
+      Pending: {
+        bg: "#fff1f2",
+        text: "#a30000",
+        border: "#fecdd3",
+        icon: <FaExclamationTriangle />,
+        msg: "No team has been dispatched yet. This incident is awaiting response.",
+      },
+      Dispatched: {
+        bg: "#eff6ff",
+        text: "#1d4ed8",
+        border: "#bfdbfe",
+        icon: <FaTruck />,
+        msg: "A response team has been dispatched and is en route to the incident site.",
+      },
+      Validated: {
+        bg: "#fef9ec",
+        text: "#92400e",
+        border: "#fde68a",
+        icon: <FaSearch />,
+        msg: "The incident has been validated by a field responder and is currently being monitored.",
+      },
+      Confirmed: {
+        bg: "#ecfdf5",
+        text: "#166534",
+        border: "#bbf7d0",
+        icon: <FaCheckCircle />,
+        msg: "This incident has been officially confirmed and resolved by the assigned response team.",
+      },
     };
     const notice = noticeConfig[status] ?? noticeConfig.Pending;
 
@@ -673,49 +1120,91 @@ const ReportPage = () => {
     const d0 = dispatches[0];
     const teamName = d0 ? getTeamName(d0) : null;
     const matched0 = d0 ? getTeamDetails(d0) : null;
-    const leaderName = matched0?.leaderName || d0?.leaderName || d0?.responders?.[0]?.name || "N/A";
-    const vehicleName = d0?.vehicle || d0?.responders?.find((r) => r?.vehicle)?.vehicle || "N/A";
+    const leaderName =
+      matched0?.leaderName ||
+      d0?.leaderName ||
+      d0?.responders?.[0]?.name ||
+      "N/A";
+    const vehicleName =
+      d0?.vehicle || d0?.responders?.find((r) => r?.vehicle)?.vehicle || "N/A";
 
-    const reportRows: (string | number)[][] = [
-      ["Report ID", selectedReport.id],
-      ["Status", selectedReport.status || "N/A"],
-      ["Reporter Name", selectedReport.userName || "N/A"],
-      ["Contact", selectedReport.userContact || "N/A"],
-      ["Email", selectedReport.userEmail || "N/A"],
-      ["Address", selectedReport.userAddress || "N/A"],
-      ["Alert Type", selectedReport.type || "N/A"],
-      ["Source", selectedReport.sourceLabel || selectedReport.source || "N/A"],
-      ["Alert Received At", alertTimestamp ? new Date(alertTimestamp * 1000).toLocaleString() : "N/A"],
-      ["Dispatch Time", dispatchTimestamp ? new Date(dispatchTimestamp * 1000).toLocaleString() : "N/A"],
-      ["Team", teamName || "N/A"],
-      ["Team Leader", leaderName],
-      ["Vehicle", vehicleName],
-      ["Validated By", validatedBy || "N/A"],
-      ["Validated At", validatedAt ? new Date(validatedAt * 1000).toLocaleString() : "N/A"],
-      ["Source of Fire", vr?.sourceOfFire || "N/A"],
-      ["Remarks", vr?.remarks || "N/A"],
-      ["Fire Types", vr?.fireTypes?.join(", ") || "N/A"],
-      ["Resources Needed", vr?.resourcesNeeded?.join(", ") || "N/A"],
-      ["Confirmed By", selectedReport.confirmedBy || d0?.confirmedBy || "N/A"],
-      ["Confirmed At", confirmedTimestamp ? new Date(confirmedTimestamp * 1000).toLocaleString() : "N/A"],
-      ["Incident Photos", allImages.length > 0 ? `${allImages.length} image(s)` : "None"],
-      ["Validation Photos", validationImages.length > 0 ? `${validationImages.length} image(s)` : "None"],
+    const reportRows: (string | number)[][] = (() => {
+  const base: (string | number)[][] = [
+    ["Report ID",     selectedReport.id],
+    ["Status",        selectedReport.status || "N/A"],
+    ["Name",          selectedReport.userName || "N/A"],
+    ["Contact",       selectedReport.userContact || "N/A"],
+    ["Email",         selectedReport.userEmail || "N/A"],
+    ["Address",       selectedReport.userAddress || "N/A"],
+    ["Alert Received",alertTimestamp ? new Date(alertTimestamp * 1000).toLocaleString() : "N/A"],
+    ["Alert Type",    selectedReport.type || "N/A"],
+    ["Source",        selectedReport.sourceLabel || selectedReport.source || "N/A"],
+  ];
+
+  if (status === "Pending") {
+    return base;
+  }
+
+  if (status === "Dispatched") {
+    return [
+      ...base,
+      ["Team Dispatched",  d0 ? getTeamName(d0) : "N/A"],
+      ["Team Leader",      (() => { const m = d0 ? getTeamDetails(d0) : null; return m?.leaderName || d0?.leaderName || d0?.responders?.[0]?.name || "N/A"; })()],
+      ["Time Dispatched",  dispatchTimestamp ? new Date(dispatchTimestamp * 1000).toLocaleString() : "N/A"],
     ];
-    if (d0?.responders) {
-      d0.responders.forEach((r, i) => {
-        reportRows.push([`Member ${i + 1}`, [r.name, r.contact, r.email].filter(Boolean).join(" · ") || "N/A"]);
-      });
-    }
+  }
+
+  if (status === "Validated") {
+    return [
+      ...base,
+      ["Team Dispatched",       d0 ? getTeamName(d0) : "N/A"],
+      ["Team Leader",           (() => { const m = d0 ? getTeamDetails(d0) : null; return m?.leaderName || d0?.leaderName || d0?.responders?.[0]?.name || "N/A"; })()],
+      ["Time Dispatched",       dispatchTimestamp ? new Date(dispatchTimestamp * 1000).toLocaleString() : "N/A"],
+      ["Validated By",          [vr?.validatedBy, vr?.validatedByEmail].filter(Boolean).join(" · ") || validatedBy || "N/A"],
+      ["Time Validated",        validatedAt ? new Date((validatedAt as number) * 1000).toLocaleString() : "N/A"],
+      ["Already Radioed",       vr?.skippedBecauseRadioed === true ? "Yes" : vr?.skippedBecauseRadioed === false ? "No" : "N/A"],
+      ["Source of Fire",        vr?.sourceOfFire || "N/A"],
+      ["Remarks",               vr?.remarks || "N/A"],
+      ["Fire Types",            vr?.fireTypes?.join(", ") || "N/A"],
+      ["Resources Needed",      vr?.resourcesNeeded?.join(", ") || "N/A"],
+      ["Validation Photos",     validationImages.length > 0 ? `${validationImages.length} image(s)` : "None"],
+    ];
+  }
+
+  if (status === "Confirmed") {
+    return [
+      ...base,
+      ["Team Dispatched",       d0 ? getTeamName(d0) : "N/A"],
+      ["Team Leader",           (() => { const m = d0 ? getTeamDetails(d0) : null; return m?.leaderName || d0?.leaderName || d0?.responders?.[0]?.name || "N/A"; })()],
+      ["Time Dispatched",       dispatchTimestamp ? new Date(dispatchTimestamp * 1000).toLocaleString() : "N/A"],
+      ["Validated By",          [vr?.validatedBy, vr?.validatedByEmail].filter(Boolean).join(" · ") || validatedBy || "N/A"],
+      ["Time Validated",        validatedAt ? new Date((validatedAt as number) * 1000).toLocaleString() : "N/A"],
+      ["Already Radioed",       vr?.skippedBecauseRadioed === true ? "Yes" : vr?.skippedBecauseRadioed === false ? "No" : "N/A"],
+      ["Source of Fire",        vr?.sourceOfFire || "N/A"],
+      ["Remarks",               vr?.remarks || "N/A"],
+      ["Fire Types",            vr?.fireTypes?.join(", ") || "N/A"],
+      ["Resources Needed",      vr?.resourcesNeeded?.join(", ") || "N/A"],
+      ["Validation Photos",     validationImages.length > 0 ? `${validationImages.length} image(s)` : "None"],
+      ["Confirmed By",          [selectedReport.confirmedBy || d0?.confirmedBy, (selectedReport as any).confirmedByEmail].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(" · ") || "N/A"],
+      ["Confirmed Time",        confirmedTimestamp ? new Date(confirmedTimestamp * 1000).toLocaleString() : "N/A"],
+    ];
+  }
+
+  return base;
+})();
 
     const subtitleParts = [`Status: ${status}`];
-    if (selectedReport.userAddress) subtitleParts.push(`Address: ${selectedReport.userAddress}`);
-    if (alertTimestamp) subtitleParts.push(`Received: ${new Date(alertTimestamp * 1000).toLocaleString()}`);
+    if (selectedReport.userAddress)
+      subtitleParts.push(`Address: ${selectedReport.userAddress}`);
+    if (alertTimestamp)
+      subtitleParts.push(
+        `Received: ${new Date(alertTimestamp * 1000).toLocaleString()}`,
+      );
 
     // ── JSX ─────────────────────────────────────────────────────────────────
     return (
       <div className={styles.modalOverlay}>
         <div className={styles.modalContent}>
-
           {/* Header */}
           <div className={styles.modalHeader}>
             <h3 className={styles.modalTitle}>Incident Report</h3>
@@ -723,19 +1212,39 @@ const ReportPage = () => {
           </div>
 
           {/* Body */}
+          {/* Body */}
           <div className={styles.modalBody}>
-            <NoticeBanner icon={notice.icon} text={notice.msg} colors={notice} />
+            <NoticeBanner
+              icon={notice.icon}
+              text={notice.msg}
+              colors={notice}
+            />
 
             {/* ── PENDING ── */}
             {status === "Pending" && (
               <>
-                <SectionCard icon={<FaUser style={{ color: "#6b7280" }} />} title="Reporter">
+                <SectionCard
+                  icon={<FaUser style={{ color: "#6b7280" }} />}
+                  title="Reporter Information"
+                >
                   <InfoRow label="Name" value={selectedReport.userName} />
                   <InfoRow label="Contact" value={selectedReport.userContact} />
                   <InfoRow label="Email" value={selectedReport.userEmail} />
                   <InfoRow label="Address" value={selectedReport.userAddress} />
                   <Divider />
-                  <InfoRow label="Alert Received" value={alertTimestamp ? new Date(alertTimestamp * 1000).toLocaleString() : null} />
+                  <InfoRow
+                    label="Alert Received"
+                    value={
+                      alertTimestamp
+                        ? new Date(alertTimestamp * 1000).toLocaleString()
+                        : null
+                    }
+                  />
+                  <InfoRow label="Alert Type" value={selectedReport.type} />
+                  <InfoRow
+                    label="Source"
+                    value={selectedReport.sourceLabel || selectedReport.source}
+                  />
                 </SectionCard>
                 <IncidentPhotosBlock />
               </>
@@ -744,35 +1253,155 @@ const ReportPage = () => {
             {/* ── DISPATCHED ── */}
             {status === "Dispatched" && (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <ReporterCardCompact />
-                  <SectionCard icon={<FaClock style={{ color: "#6b7280" }} />} title="Dispatch Timeline">
-                    <TimelineItem label="Alert Received" ts={alertTimestamp} color="#f59e0b" />
-                    <TimelineItem label="Dispatched" ts={dispatchTimestamp} by={d0 ? getTeamName(d0) : null} color="#3b82f6" last />
-                  </SectionCard>
-                </div>
-                <TeamBlock />
+                <SectionCard
+                  icon={<FaUser style={{ color: "#6b7280" }} />}
+                  title="Reporter Information"
+                >
+                  <InfoRow label="Name" value={selectedReport.userName} />
+                  <InfoRow label="Contact" value={selectedReport.userContact} />
+                  <InfoRow label="Email" value={selectedReport.userEmail} />
+                  <InfoRow label="Address" value={selectedReport.userAddress} />
+                  <Divider />
+                  <InfoRow label="Alert Type" value={selectedReport.type} />
+                  <InfoRow
+                    label="Source"
+                    value={selectedReport.sourceLabel || selectedReport.source}
+                  />
+                </SectionCard>
                 <IncidentPhotosBlock />
+                <SectionCard
+                  icon={<FaTruck style={{ color: "#6b7280" }} />}
+                  title="Dispatch Information"
+                >
+                  <InfoRow
+                    label="Team Dispatched"
+                    value={d0 ? getTeamName(d0) : null}
+                  />
+                  <InfoRow
+                    label="Team Leader"
+                    value={(() => {
+                      const matched = d0 ? getTeamDetails(d0) : null;
+                      return (
+                        matched?.leaderName ||
+                        d0?.leaderName ||
+                        d0?.responders?.[0]?.name ||
+                        null
+                      );
+                    })()}
+                  />
+                  <InfoRow
+                    label="Time Dispatched"
+                    value={
+                      dispatchTimestamp
+                        ? new Date(dispatchTimestamp * 1000).toLocaleString()
+                        : null
+                    }
+                  />
+                </SectionCard>
               </>
             )}
 
             {/* ── VALIDATED ── */}
             {status === "Validated" && (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <ReporterCardCompact />
-                  <SectionCard icon={<FaClock style={{ color: "#6b7280" }} />} title="Incident Timeline">
-                    <TimelineItem label="Alert Received" ts={alertTimestamp} color="#f59e0b" />
-                    {dispatchTimestamp && (
-                      <TimelineItem label="Dispatched" ts={dispatchTimestamp} by={d0 ? getTeamName(d0) : null} color="#3b82f6" />
-                    )}
-                    <TimelineItem label="Validated" ts={validatedAt} by={validatedBy} color="#d97706" last />
-                  </SectionCard>
-                </div>
-                <ValidationReportBlock />
-                <MonitoringBlock />
-                <TeamBlock showMembers={false} />
+                <SectionCard
+                  icon={<FaUser style={{ color: "#6b7280" }} />}
+                  title="Reporter Information"
+                >
+                  <InfoRow label="Name" value={selectedReport.userName} />
+                  <InfoRow label="Contact" value={selectedReport.userContact} />
+                  <InfoRow label="Email" value={selectedReport.userEmail} />
+                  <InfoRow label="Address" value={selectedReport.userAddress} />
+                  <Divider />
+                  <InfoRow label="Alert Type" value={selectedReport.type} />
+                  <InfoRow
+                    label="Source"
+                    value={selectedReport.sourceLabel || selectedReport.source}
+                  />
+                </SectionCard>
                 <IncidentPhotosBlock />
+                <SectionCard
+                  icon={<FaTruck style={{ color: "#6b7280" }} />}
+                  title="Dispatch Information"
+                >
+                  <InfoRow
+                    label="Team Dispatched"
+                    value={d0 ? getTeamName(d0) : null}
+                  />
+                  <InfoRow
+                    label="Team Leader"
+                    value={(() => {
+                      const matched = d0 ? getTeamDetails(d0) : null;
+                      return (
+                        matched?.leaderName ||
+                        d0?.leaderName ||
+                        d0?.responders?.[0]?.name ||
+                        null
+                      );
+                    })()}
+                  />
+                  <InfoRow
+                    label="Time Dispatched"
+                    value={
+                      dispatchTimestamp
+                        ? new Date(dispatchTimestamp * 1000).toLocaleString()
+                        : null
+                    }
+                  />
+                </SectionCard>
+                <SectionCard
+                  icon={<FaSearch style={{ color: "#6b7280" }} />}
+                  title="Validation Information"
+                >
+                  <InfoRow
+                    label="Validated By"
+                    value={
+                      [vr?.validatedBy, vr?.validatedByEmail]
+                        .filter(Boolean)
+                        .join(" · ") ||
+                      validatedBy ||
+                      null
+                    }
+                  />
+                  <InfoRow
+                    label="Time Validated"
+                    value={
+                      validatedAt
+                        ? new Date(
+                            (validatedAt as number) * 1000,
+                          ).toLocaleString()
+                        : null
+                    }
+                  />
+                  <InfoRow
+                    label="Already Radioed"
+                    value={
+                      vr?.skippedBecauseRadioed === true
+                        ? "Yes"
+                        : vr?.skippedBecauseRadioed === false
+                          ? "No"
+                          : "N/A"
+                    }
+                  />
+                  {vr?.sourceOfFire && (
+                    <InfoRow label="Source of Fire" value={vr.sourceOfFire} />
+                  )}
+                  {vr?.remarks && (
+                    <InfoRow label="Remarks" value={vr.remarks} />
+                  )}
+                  {(vr?.fireTypes?.length ?? 0) > 0 && (
+                    <InfoRow
+                      label="Fire Types"
+                      value={vr!.fireTypes!.join(", ")}
+                    />
+                  )}
+                  {(vr?.resourcesNeeded?.length ?? 0) > 0 && (
+                    <InfoRow
+                      label="Resources Needed"
+                      value={vr!.resourcesNeeded!.join(", ")}
+                    />
+                  )}
+                </SectionCard>
                 <ValidationPhotosBlock />
               </>
             )}
@@ -780,37 +1409,131 @@ const ReportPage = () => {
             {/* ── CONFIRMED ── */}
             {status === "Confirmed" && (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <SectionCard icon={<FaUser style={{ color: "#6b7280" }} />} title="Reporter">
-                    <InfoRow label="Name" value={selectedReport.userName} />
-                    <InfoRow label="Contact" value={selectedReport.userContact} />
-                    <InfoRow label="Email" value={selectedReport.userEmail} />
-                    <InfoRow label="Address" value={selectedReport.userAddress} />
-                    <Divider />
-                    <InfoRow label="Alert Type" value={selectedReport.type} />
-                    <InfoRow label="Source" value={selectedReport.sourceLabel || selectedReport.source} />
-                  </SectionCard>
-                  <SectionCard icon={<FaClock style={{ color: "#6b7280" }} />} title="Full Incident Timeline">
-                    <TimelineItem label="Alert Received" ts={alertTimestamp} color="#f59e0b" />
-                    {dispatchTimestamp && (
-                      <TimelineItem label="Dispatched" ts={dispatchTimestamp} by={d0 ? getTeamName(d0) : null} color="#3b82f6" />
-                    )}
-                    {validatedAt && (
-                      <TimelineItem label="Validated" ts={validatedAt} by={validatedBy} color="#d97706" />
-                    )}
-                    <TimelineItem label="Confirmed" ts={confirmedTimestamp} by={selectedReport.confirmedBy || d0?.confirmedBy} color="#16a34a" last />
-                  </SectionCard>
-                </div>
-                <ValidationReportBlock />
-                <MonitoringBlock />
-                <SectionCard icon={<FaCheckCircle style={{ color: "#16a34a" }} />} title="Confirmation Details">
-                  <InfoRow label="Confirmed By" value={selectedReport.confirmedBy || d0?.confirmedBy} />
-                  <InfoRow label="Confirmed At" value={confirmedTimestamp ? new Date(confirmedTimestamp * 1000).toLocaleString() : null} />
-                  <InfoRow label="Confirmation Status" value={selectedReport.confirmationStatus} />
+                <SectionCard
+                  icon={<FaUser style={{ color: "#6b7280" }} />}
+                  title="Reporter Information"
+                >
+                  <InfoRow label="Name" value={selectedReport.userName} />
+                  <InfoRow label="Contact" value={selectedReport.userContact} />
+                  <InfoRow label="Email" value={selectedReport.userEmail} />
+                  <InfoRow label="Address" value={selectedReport.userAddress} />
+                  <Divider />
+                  <InfoRow label="Alert Type" value={selectedReport.type} />
+                  <InfoRow
+                    label="Source"
+                    value={selectedReport.sourceLabel || selectedReport.source}
+                  />
                 </SectionCard>
-                <TeamBlock showMembers />
                 <IncidentPhotosBlock />
+                <SectionCard
+                  icon={<FaTruck style={{ color: "#6b7280" }} />}
+                  title="Dispatch Information"
+                >
+                  <InfoRow
+                    label="Team Dispatched"
+                    value={d0 ? getTeamName(d0) : null}
+                  />
+                  <InfoRow
+                    label="Team Leader"
+                    value={(() => {
+                      const matched = d0 ? getTeamDetails(d0) : null;
+                      return (
+                        matched?.leaderName ||
+                        d0?.leaderName ||
+                        d0?.responders?.[0]?.name ||
+                        null
+                      );
+                    })()}
+                  />
+                  <InfoRow
+                    label="Time Dispatched"
+                    value={
+                      dispatchTimestamp
+                        ? new Date(dispatchTimestamp * 1000).toLocaleString()
+                        : null
+                    }
+                  />
+                </SectionCard>
+                <SectionCard
+                  icon={<FaSearch style={{ color: "#6b7280" }} />}
+                  title="Validation Information"
+                >
+                  <InfoRow
+                    label="Validated By"
+                    value={
+                      [vr?.validatedBy, vr?.validatedByEmail]
+                        .filter(Boolean)
+                        .join(" · ") ||
+                      validatedBy ||
+                      null
+                    }
+                  />
+                  <InfoRow
+                    label="Time Validated"
+                    value={
+                      validatedAt
+                        ? new Date(
+                            (validatedAt as number) * 1000,
+                          ).toLocaleString()
+                        : null
+                    }
+                  />
+                  <InfoRow
+                    label="Already Radioed"
+                    value={
+                      vr?.skippedBecauseRadioed === true
+                        ? "Yes"
+                        : vr?.skippedBecauseRadioed === false
+                          ? "No"
+                          : "N/A"
+                    }
+                  />
+                  {vr?.sourceOfFire && (
+                    <InfoRow label="Source of Fire" value={vr.sourceOfFire} />
+                  )}
+                  {vr?.remarks && (
+                    <InfoRow label="Remarks" value={vr.remarks} />
+                  )}
+                  {(vr?.fireTypes?.length ?? 0) > 0 && (
+                    <InfoRow
+                      label="Fire Types"
+                      value={vr!.fireTypes!.join(", ")}
+                    />
+                  )}
+                  {(vr?.resourcesNeeded?.length ?? 0) > 0 && (
+                    <InfoRow
+                      label="Resources Needed"
+                      value={vr!.resourcesNeeded!.join(", ")}
+                    />
+                  )}
+                </SectionCard>
                 <ValidationPhotosBlock />
+                <SectionCard
+                  icon={<FaCheckCircle style={{ color: "#16a34a" }} />}
+                  title="Confirmation Details"
+                >
+                  <InfoRow
+                    label="Confirmed By"
+                    value={
+                      [
+                        selectedReport.confirmedBy || d0?.confirmedBy,
+                        (selectedReport as any).confirmedByEmail ||
+                          d0?.confirmedBy,
+                      ]
+                        .filter(Boolean)
+                        .filter((v, i, a) => a.indexOf(v) === i)
+                        .join(" · ") || null
+                    }
+                  />
+                  <InfoRow
+                    label="Confirmed Time"
+                    value={
+                      confirmedTimestamp
+                        ? new Date(confirmedTimestamp * 1000).toLocaleString()
+                        : null
+                    }
+                  />
+                </SectionCard>
               </>
             )}
           </div>
@@ -825,7 +1548,9 @@ const ReportPage = () => {
               rows={reportRows}
               filename={`fire-report-${selectedReport.id}`}
             />
-            <button className={styles.closeBtn} onClick={closeModal}><span>Close</span></button>
+            <button className={styles.closeBtn} onClick={closeModal}>
+              <span>Close</span>
+            </button>
           </div>
         </div>
       </div>
@@ -849,15 +1574,21 @@ const ReportPage = () => {
           <div className={styles.infoBox}>
             <FaInfoCircle className={styles.infoIcon} />
             <p className={styles.infoText}>
-              This page displays all recorded fire incident reports, including reporter details,
-              address, status, and dispatch activity. Use the search bar and status filters to
-              quickly find and review specific incident records.
+              This page displays all recorded fire incident reports, including
+              reporter details, address, status, and dispatch activity. Use the
+              search bar and status filters to quickly find and review specific
+              incident records.
             </p>
           </div>
 
           <div className={styles.filtersRow}>
             <div className={styles.searchWrapper}>
-              <input type="text" placeholder="Search reports..." value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input
+                type="text"
+                placeholder="Search reports..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
               <FiSearch />
             </div>
 
@@ -868,36 +1599,72 @@ const ReportPage = () => {
                   className={`${styles.filterBtn} ${filterBarangay !== "All Barangays" ? styles.activeBarangayFilter : ""}`}
                 >
                   <FaMapMarkerAlt className={styles.pinIcon} />
-                  {filterBarangay === "All Barangays" ? "All Barangay" : filterBarangay}
-                  <FiChevronDown className={`${styles.chevronIcon} ${barangayOpen ? styles.chevronOpen : ""}`} />
+                  {filterBarangay === "All Barangays"
+                    ? "All Barangay"
+                    : filterBarangay}
+                  <FiChevronDown
+                    className={`${styles.chevronIcon} ${barangayOpen ? styles.chevronOpen : ""}`}
+                  />
                 </button>
                 {barangayOpen && (
                   <div className={styles.barangayDropdown}>
                     {BACOOR_BARANGAYS.map((b) => (
-                      <button key={b}
-                        onClick={() => { setFilterBarangay(b); setBarangayOpen(false); }}
+                      <button
+                        key={b}
+                        onClick={() => {
+                          setFilterBarangay(b);
+                          setBarangayOpen(false);
+                        }}
                         className={`${styles.barangayOption} ${filterBarangay === b ? styles.selectedBarangay : ""}`}
-                      >{b}</button>
+                      >
+                        {b}
+                      </button>
                     ))}
                   </div>
                 )}
               </div>
 
               <div className={styles.dateRangeWrapper}>
-                <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} className={styles.dateInput} title="From date" />
+                <input
+                  type="date"
+                  value={filterDateFrom}
+                  onChange={(e) => setFilterDateFrom(e.target.value)}
+                  className={styles.dateInput}
+                  title="From date"
+                />
                 <span className={styles.dateSeparator}>–</span>
-                <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} className={styles.dateInput} title="To date" />
+                <input
+                  type="date"
+                  value={filterDateTo}
+                  onChange={(e) => setFilterDateTo(e.target.value)}
+                  className={styles.dateInput}
+                  title="To date"
+                />
                 {(filterDateFrom || filterDateTo) && (
-                  <button className={styles.dateClearBtn} onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }} title="Clear dates">×</button>
+                  <button
+                    className={styles.dateClearBtn}
+                    onClick={() => {
+                      setFilterDateFrom("");
+                      setFilterDateTo("");
+                    }}
+                    title="Clear dates"
+                  >
+                    ×
+                  </button>
                 )}
               </div>
 
-              {["All", "Pending", "Dispatched", "Validated", "Confirmed"].map((s) => (
-                <button key={s}
-                  className={`${styles.filterBtn} ${styles[`${s.toLowerCase()}Btn` as keyof typeof styles]} ${filterStatus === s ? styles.activeFilter : ""}`}
-                  onClick={() => setFilterStatus(s)}
-                >{s}</button>
-              ))}
+              {["All", "Pending", "Dispatched", "Validated", "Confirmed"].map(
+                (s) => (
+                  <button
+                    key={s}
+                    className={`${styles.filterBtn} ${styles[`${s.toLowerCase()}Btn` as keyof typeof styles]} ${filterStatus === s ? styles.activeFilter : ""}`}
+                    onClick={() => setFilterStatus(s)}
+                  >
+                    {s}
+                  </button>
+                ),
+              )}
             </div>
           </div>
 
@@ -905,26 +1672,49 @@ const ReportPage = () => {
             <table className={styles.reportTable}>
               <thead>
                 <tr>
-                  <th>Name</th><th>Address</th><th>Status</th><th>Received At</th><th>Actions</th>
+                  <th>Name</th>
+                  <th>Address</th>
+                  <th>Status</th>
+                  <th>Received At</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedReports.length > 0 ? paginatedReports.map((r) => (
-                  <tr key={r.id}>
-                    <td data-label="Name">{r.userName || "Unknown"}</td>
-                    <td data-label="Address">{r.userAddress || "Unknown"}</td>
-                    <td data-label="Status">
-                      <span className={`${styles.statusBadge} ${styles[r.status?.toLowerCase() as keyof typeof styles] || ""}`}>
-                        {r.status || "Unknown"}
-                      </span>
-                    </td>
-                    <td data-label="Received At">{r.timestamp ? new Date(r.timestamp.seconds * 1000).toLocaleString() : "Unknown"}</td>
-                    <td data-label="Actions">
-                      <button className={styles.viewBtn} onClick={() => setSelectedReport(r)}><span>View</span></button>
+                {paginatedReports.length > 0 ? (
+                  paginatedReports.map((r) => (
+                    <tr key={r.id}>
+                      <td data-label="Name">{r.userName || "Unknown"}</td>
+                      <td data-label="Address">{r.userAddress || "Unknown"}</td>
+                      <td data-label="Status">
+                        <span
+                          className={`${styles.statusBadge} ${styles[r.status?.toLowerCase() as keyof typeof styles] || ""}`}
+                        >
+                          {r.status || "Unknown"}
+                        </span>
+                      </td>
+                      <td data-label="Received At">
+                        {r.timestamp
+                          ? new Date(
+                              r.timestamp.seconds * 1000,
+                            ).toLocaleString()
+                          : "Unknown"}
+                      </td>
+                      <td data-label="Actions">
+                        <button
+                          className={styles.viewBtn}
+                          onClick={() => setSelectedReport(r)}
+                        >
+                          <span>View</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className={styles.noResults}>
+                      No reports found.
                     </td>
                   </tr>
-                )) : (
-                  <tr><td colSpan={5} className={styles.noResults}>No reports found.</td></tr>
                 )}
               </tbody>
             </table>
@@ -932,9 +1722,25 @@ const ReportPage = () => {
 
           {filteredReports.length > 0 && (
             <div className={styles.pagination}>
-              <button className={styles.pageBtn} onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1}>Prev</button>
-              <span className={styles.pageInfo}>Page {currentPage} of {totalPages || 1}</span>
-              <button className={styles.pageBtn} onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages || totalPages === 0}>Next</button>
+              <button
+                className={styles.pageBtn}
+                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                Prev
+              </button>
+              <span className={styles.pageInfo}>
+                Page {currentPage} of {totalPages || 1}
+              </span>
+              <button
+                className={styles.pageBtn}
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(p + 1, totalPages))
+                }
+                disabled={currentPage === totalPages || totalPages === 0}
+              >
+                Next
+              </button>
             </div>
           )}
         </div>
@@ -942,14 +1748,30 @@ const ReportPage = () => {
         {renderModal()}
 
         {lightboxSrc && (
-          <div onClick={() => setLightboxSrc(null)} style={{
-            position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.85)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "zoom-out", padding: 24,
-          }}>
+          <div
+            onClick={() => setLightboxSrc(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 3000,
+              background: "rgba(0,0,0,0.85)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "zoom-out",
+              padding: 24,
+            }}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={lightboxSrc} alt="Full-size preview"
-              style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 12, boxShadow: "0 12px 40px rgba(0,0,0,0.5)" }}
+            <img
+              src={lightboxSrc}
+              alt="Full-size preview"
+              style={{
+                maxWidth: "100%",
+                maxHeight: "100%",
+                borderRadius: 12,
+                boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+              }}
               onClick={(e) => e.stopPropagation()}
             />
           </div>

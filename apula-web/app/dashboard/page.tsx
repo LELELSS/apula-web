@@ -1480,6 +1480,13 @@ const AdminDashboard = () => {
                   })()}
                 </div>
 
+                <div className={styles.chartInfoBox}>
+                      <FaInfoCircle className={styles.infoIcon} />
+                      <p className={styles.chartInfoText}>
+                        Shows barangay overview for {getBarangayPeriodLabel()}
+                      </p>
+                    </div>
+
                 <div className={styles.analyticsActions}>
                   {/*
                     subtitle       → getBarangayDownloadSubtitle() — full filter summary

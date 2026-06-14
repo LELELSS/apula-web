@@ -32,7 +32,7 @@ const parseSession = (raw: string | undefined): SessionPayload | null => {
   }
 };
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const rawCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const session = parseSession(rawCookie);

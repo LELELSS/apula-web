@@ -47,6 +47,26 @@ export default function TeamVehiclePage() {
 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [viewingTeam, setViewingTeam] = useState<any | null>(null);
+  const getTeamTooltip = (team: any) => {
+    const teamMembers = responders.filter((r) => r.teamId === team.id);
+    const leaderName = team.leaderName || team.leader || "—";
+    const others = teamMembers
+      .filter((r) => r.id !== team.leaderId)
+      .map((r) => r.name);
+
+    return [
+      `Leader: ${leaderName}`,
+      others.length > 0 ? `Members: ${others.join(", ")}` : "Members: none",
+    ].join("\n");
+  };
+
+  const openTeamView = (team: any) => {
+    setViewingTeam({
+      ...team,
+      status: normalizeStatus(team.status || "Available"),
+    });
+  };
 
   const normalizeStatus = (raw: any) => {
     if (!raw) return "";
@@ -239,102 +259,76 @@ export default function TeamVehiclePage() {
   };
 
   const saveEditTeam = async () => {
-    if (!editingTeam) return;
+    if (!viewingTeam) return;
 
     try {
-      const oldTeam = teams.find((t) => t.id === editingTeam.id);
+      const oldTeam = teams.find((t) => t.id === viewingTeam.id);
       const oldLeaderId = oldTeam?.leaderId || "";
 
-      const teamRef = doc(db, "teams", editingTeam.id);
+      const teamRef = doc(db, "teams", viewingTeam.id);
       const batch = writeBatch(db);
 
-      const newLeaderId = editingTeam.leaderId;
+      const newLeaderId = viewingTeam.leaderId;
       const newLeader = responders.find((r) => r.id === newLeaderId);
 
-      if (!newLeaderId) {
+      if (!newLeaderId || !newLeader) {
         setErrorMessage("Please select a leader.");
         return;
       }
 
-      if (!newLeader) {
-        setErrorMessage("Selected leader not found.");
-        return;
-      }
-
-      const existingLeaderTeam = teams.find(
-        (t) => t.leaderId === newLeaderId && t.id !== editingTeam.id,
+      // Build the new members array: same member list, just swap who's marked leader
+      const currentTeamMembers = responders.filter(
+        (r) => r.teamId === viewingTeam.id,
       );
-
-      if (existingLeaderTeam) {
-        setErrorMessage(
-          `${newLeader.name} is already assigned as leader of team ${existingLeaderTeam.teamName}.`,
-        );
-        return;
-      }
-
-      const updatedMembers = [
-        {
-          id: newLeader.id,
-          name: newLeader.name,
-          status: editingTeam.status || "Available",
-          teamName: editingTeam.teamName,
-        },
-      ];
+      const updatedMembers = currentTeamMembers.map((m) => ({
+        id: m.id,
+        name: m.name,
+        status:
+          m.id === newLeaderId
+            ? viewingTeam.status || "Available"
+            : m.status || "Available",
+        teamName: viewingTeam.teamName,
+      }));
 
       batch.update(teamRef, {
-        teamName: editingTeam.teamName,
+        teamName: viewingTeam.teamName,
         leaderId: newLeaderId,
         leaderName: newLeader.name,
         members: updatedMembers,
-        status: editingTeam.status,
+        status: viewingTeam.status,
       });
 
       const respondersQuery = query(
         collection(db, "users"),
-        where("teamId", "==", editingTeam.id),
+        where("teamId", "==", viewingTeam.id),
       );
       const respondersSnap = await getDocs(respondersQuery);
 
       respondersSnap.docs.forEach((userDoc) => {
         batch.update(doc(db, "users", userDoc.id), {
-          teamName: editingTeam.teamName,
-          status: editingTeam.status,
+          teamName: viewingTeam.teamName,
+          // only the new leader's status follows the team status change;
+          // everyone else keeps their own current status
+          ...(userDoc.id === newLeaderId ? { status: viewingTeam.status } : {}),
         });
-      });
-
-      if (oldLeaderId && oldLeaderId !== newLeaderId) {
-        batch.update(doc(db, "users", oldLeaderId), {
-          teamId: "",
-          teamName: "",
-          vehicleId: "",
-          vehicleCode: "",
-          vehiclePlate: "",
-          status: "Available",
-        });
-      }
-
-      batch.update(doc(db, "users", newLeader.id), {
-        teamId: editingTeam.id,
-        teamName: editingTeam.teamName,
-        status: editingTeam.status,
       });
 
       const vehiclesQuery = query(
         collection(db, "vehicles"),
-        where("assignedTeamId", "==", editingTeam.id),
+        where("assignedTeamId", "==", viewingTeam.id),
       );
       const vehiclesSnap = await getDocs(vehiclesQuery);
 
       vehiclesSnap.docs.forEach((vehicleDoc) => {
         batch.update(doc(db, "vehicles", vehicleDoc.id), {
-          assignedTeam: editingTeam.teamName,
-          status: editingTeam.status,
+          assignedTeam: viewingTeam.teamName,
+          status: viewingTeam.status,
         });
       });
 
       await batch.commit();
 
-      setEditingTeam(null);
+      setViewingTeam(null);
       setSuccessMessage("Team updated successfully.");
     } catch (err) {
       console.error(err);
@@ -496,6 +490,7 @@ export default function TeamVehiclePage() {
       if (confirmDelete.type === "team") {
         await deleteTeam(confirmDelete.id);
         setSuccessMessage("Team deleted successfully.");
+        if (viewingTeam?.id === confirmDelete.id) setViewingTeam(null);
       } else {
         await deleteVehicle(confirmDelete.id);
         setSuccessMessage("Vehicle deleted successfully.");
@@ -510,7 +505,7 @@ export default function TeamVehiclePage() {
   return (
     <div className={styles.pageWrapper}>
       <AdminHeader />
-      
+
       <AlertBellButton />
       <AdminTutorialChat />
 
@@ -563,10 +558,7 @@ export default function TeamVehiclePage() {
                 <div>
                   <button
                     className={styles.addBtn}
-                    onClick={() => {
-                      setShowAddTeamModal(true);
-                      setEditingTeam(null);
-                    }}
+                    onClick={() => setShowAddTeamModal(true)}
                   >
                     + Add Team
                   </button>
@@ -588,52 +580,57 @@ export default function TeamVehiclePage() {
                 </thead>
 
                 <tbody>
-                  {[...teams].sort((a, b) => (a.teamName ?? "").localeCompare(b.teamName ?? "")).map((team) => {
-                    const memberCount = responders.filter(
-                      (r) => r.teamId === team.id,
-                    ).length;
+                  {[...teams]
+                    .sort((a, b) =>
+                      (a.teamName ?? "").localeCompare(b.teamName ?? ""),
+                    )
+                    .map((team) => {
+                      const memberCount = responders.filter(
+                        (r) => r.teamId === team.id,
+                      ).length;
 
-                    return (
-                      <tr key={team.id}>
-                        <td data-label="Team Name">{team.teamName}</td>
-                        <td data-label="Members">{memberCount}</td>
-                        <td data-label="Leader">
-                          {team.leaderName || team.leader || "—"}
-                        </td>
-                        <td data-label="Status">
-                          <span
-                            className={
-                              team.status === "Dispatched"
-                                ? styles.statusDispatched
-                                : team.status === "Unavailable"
-                                  ? styles.statusUnavailable
-                                  : styles.statusAvailable
-                            }
-                          >
-                            {team.status}
-                          </span>
-                        </td>
-
-                        <td data-label="Action">
-                          <button
-                            onClick={() => openEditTeam(team)}
-                            className={styles.editBtn}
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            onClick={() =>
-                              setConfirmDelete({ type: "team", id: team.id })
-                            }
-                            className={styles.deleteBtn}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                      return (
+                        <tr
+                          key={team.id}
+                          onClick={() => openTeamView(team)}
+                          style={{ cursor: "pointer" }}
+                        >
+                          <td data-label="Team Name">{team.teamName}</td>
+                          <td data-label="Members" title={getTeamTooltip(team)}>
+                            <span>
+                              {memberCount}
+                            </span>
+                          </td>
+                          <td data-label="Leader">
+                            {team.leaderName || team.leader || "—"}
+                          </td>
+                          <td data-label="Status">
+                            <span
+                              className={
+                                team.status === "Dispatched"
+                                  ? styles.statusDispatched
+                                  : team.status === "Unavailable"
+                                    ? styles.statusUnavailable
+                                    : styles.statusAvailable
+                              }
+                            >
+                              {team.status}
+                            </span>
+                          </td>
+                          <td data-label="Action">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openTeamView(team);
+                              }}
+                              className={styles.editBtn}
+                            >
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </>
@@ -683,56 +680,153 @@ export default function TeamVehiclePage() {
                 </thead>
 
                 <tbody>
-                  {[...vehicles].sort((a, b) => (a.code ?? "").localeCompare(b.code ?? "")).map((v) => (
-                    <tr key={v.id}>
-                      <td data-label="Vehicle Code">{v.code}</td>
-                      <td data-label="Plate Number">{v.plate}</td>
-                      <td data-label="Team Assigned">
-                        {v.assignedTeam ||
-                          teams.find((t) => t.id === v.assignedTeamId)
-                            ?.teamName ||
-                          "—"}
-                      </td>
+                  {[...vehicles]
+                    .sort((a, b) => (a.code ?? "").localeCompare(b.code ?? ""))
+                    .map((v) => (
+                      <tr key={v.id}>
+                        <td data-label="Vehicle Code">{v.code}</td>
+                        <td data-label="Plate Number">{v.plate}</td>
+                        <td data-label="Team Assigned">
+                          {v.assignedTeam ||
+                            teams.find((t) => t.id === v.assignedTeamId)
+                              ?.teamName ||
+                            "—"}
+                        </td>
 
-                      <td data-label="Status">
-                        <span
-                          className={
-                            v.status === "Dispatched"
-                              ? styles.statusDispatched
-                              : v.status === "Unavailable"
-                                ? styles.statusUnavailable
-                                : styles.statusAvailable
-                          }
-                        >
-                          {v.status}
-                        </span>
-                      </td>
+                        <td data-label="Status">
+                          <span
+                            className={
+                              v.status === "Dispatched"
+                                ? styles.statusDispatched
+                                : v.status === "Unavailable"
+                                  ? styles.statusUnavailable
+                                  : styles.statusAvailable
+                            }
+                          >
+                            {v.status}
+                          </span>
+                        </td>
 
-                      <td data-label="Action">
-                        <button
-                          onClick={() => openEditVehicle(v)}
-                          className={styles.editBtn}
-                        >
-                          Edit
-                        </button>
+                        <td data-label="Action">
+                          <button
+                            onClick={() => openEditVehicle(v)}
+                            className={styles.editBtn}
+                          >
+                            Edit
+                          </button>
 
-                        <button
-                          onClick={() =>
-                            setConfirmDelete({ type: "vehicle", id: v.id })
-                          }
-                          className={styles.deleteBtn}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          <button
+                            onClick={() =>
+                              setConfirmDelete({ type: "vehicle", id: v.id })
+                            }
+                            className={styles.deleteBtn}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </>
           )}
         </div>
       </div>
+
+      {viewingTeam && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h3 className={styles.modalTitle}>Team Details</h3>
+
+            <label className={styles.label}>Team Name</label>
+            <input
+              className={styles.input}
+              type="text"
+              value={viewingTeam.teamName}
+              onChange={(e) =>
+                setViewingTeam((s: any) => ({ ...s, teamName: e.target.value }))
+              }
+            />
+
+            <label className={styles.label}>Team Leader</label>
+            <select
+              className={styles.input}
+              value={viewingTeam.leaderId}
+              onChange={(e) =>
+                setViewingTeam((s: any) => ({ ...s, leaderId: e.target.value }))
+              }
+            >
+              <option value="">Select Leader</option>
+              {responders
+                .filter((r) => r.teamId === viewingTeam.id)
+                .map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+            </select>
+
+            <label className={styles.label}>Status</label>
+            <select
+              className={styles.input}
+              value={viewingTeam.status}
+              onChange={(e) =>
+                setViewingTeam((s: any) => ({ ...s, status: e.target.value }))
+              }
+            >
+              <option value="Available">Available</option>
+              <option value="Dispatched">Dispatched</option>
+              <option value="Unavailable">Unavailable</option>
+            </select>
+
+            <p style={{ marginTop: 16, marginBottom: 8 }}>
+              <b>Other Members:</b>
+            </p>
+
+            <ul style={{ marginBottom: 20, paddingLeft: 20 }}>
+              {responders
+                .filter(
+                  (r) =>
+                    r.teamId === viewingTeam.id &&
+                    r.id !== viewingTeam.leaderId,
+                )
+                .map((r) => (
+                  <li key={r.id}>
+                    {r.name}
+                    {r.status ? ` — ${r.status}` : ""}
+                  </li>
+                ))}
+
+              {responders.filter(
+                (r) =>
+                  r.teamId === viewingTeam.id && r.id !== viewingTeam.leaderId,
+              ).length === 0 && <li>No other members.</li>}
+            </ul>
+
+            <div className={styles.modalActions}>
+              <button className={styles.saveBtn} onClick={saveEditTeam}>
+                Save Changes
+              </button>
+
+              <button
+                className={styles.deleteBtn}
+                onClick={() =>
+                  setConfirmDelete({ type: "team", id: viewingTeam.id })
+                }
+              >
+                Delete Team
+              </button>
+
+              <button
+                className={styles.closeBtn}
+                onClick={() => setViewingTeam(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddTeamModal && !editingTeam && (
         <div className={styles.modalOverlay}>
